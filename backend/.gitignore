@@ -1,0 +1,23 @@
+# Dependencias
+node_modules/
+
+# Base de datos
+prisma/dev.db
+prisma/dev.db-journal
+
+# Variables de entorno
+.env
+
+# Cache y logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
