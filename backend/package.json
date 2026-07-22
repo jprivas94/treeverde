@@ -9,6 +9,7 @@
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "node prisma/seed.js",
     "db:generate": "npx prisma generate",
+    "build": "prisma generate",
     "vercel-build": "prisma generate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
@@ -18,11 +19,11 @@
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "express": "^4.21.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "prisma": "^6.0.0"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
-    "globals": "^17.7.0",
-    "prisma": "^6.0.0"
+    "globals": "^17.7.0"
   }
 }
