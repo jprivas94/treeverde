@@ -9,6 +9,7 @@
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "node prisma/seed.js",
     "db:generate": "npx prisma generate",
+    "vercel-build": "prisma generate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
