@@ -21,6 +21,17 @@ const priorityConfig = {
   CRITICAL: { label: 'Crítica', class: 'text-red-700 bg-red-100' },
 };
 
+const STATUS_ORDER = ['TODO', 'IN_PROGRESS', 'DONE', 'ARCHIVED'];
+
+const transitionLabels = {
+  'TODO->IN_PROGRESS': 'En progreso',
+  'IN_PROGRESS->TODO': 'Atrás',
+  'IN_PROGRESS->DONE': 'Revisión',
+  'DONE->IN_PROGRESS': 'Atrás',
+  'DONE->ARCHIVED': 'Terminar',
+  'ARCHIVED->DONE': 'Restaurar',
+};
+
 function formatDate(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
@@ -35,11 +46,25 @@ function isOverdue(dateStr) {
   return d < new Date(new Date().toDateString());
 }
 
-export default function TaskCard({ task, index, onEdit }) {
+export default function TaskCard({ task, index, onEdit, onMove }) {
   const priority = priorityConfig[task.priority] || priorityConfig.MEDIUM;
   const dueDateStr = formatDate(task.dueDate);
   const overdue = isOverdue(task.dueDate);
   const tags = task.tags ? task.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
+
+  // Determinar transiciones válidas
+  const idx = STATUS_ORDER.indexOf(task.status);
+  const canMoveLeft = idx > 0;
+  const canMoveRight = idx < STATUS_ORDER.length - 1 && task.status !== 'ARCHIVED';
+  const prevStatus = canMoveLeft ? STATUS_ORDER[idx - 1] : null;
+  const nextStatus = canMoveRight ? STATUS_ORDER[idx + 1] : null;
+  const prevLabel = prevStatus ? transitionLabels[`${task.status}->${prevStatus}`] : null;
+  const nextLabel = nextStatus ? transitionLabels[`${task.status}->${nextStatus}`] : null;
+
+  const handleClick = (e, status) => {
+    e.stopPropagation();
+    onMove?.(task, status);
+  };
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -49,14 +74,14 @@ export default function TaskCard({ task, index, onEdit }) {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={() => onEdit?.(task)}
-          className={`bg-white rounded-xl p-4 pb-3 shadow-sm border border-gray-200 transition select-none ${
+          className={`bg-white rounded-xl p-3 sm:p-4 pb-2 sm:pb-3 shadow-sm border border-gray-200 transition select-none group/card ${
             snapshot.isDragging ? 'shadow-xl rotate-2 border-emerald-400' : 'hover:shadow-md hover:border-gray-300 cursor-pointer'
           }`}
         >
           {/* Header: Estado + Prioridad + asa visual */}
           <div className="flex items-start gap-2 mb-2">
             {/* Asa visual (solo decorativa) */}
-            <div className="mt-0.5 flex-shrink-0 flex flex-col gap-0.5 opacity-30 group-hover/card:opacity-60 transition">
+            <div className="mt-0.5 flex-shrink-0 flex flex-col gap-0.5 opacity-30 transition">
               <div className="w-1 h-1 rounded-full bg-gray-400" />
               <div className="w-1 h-1 rounded-full bg-gray-400" />
               <div className="w-1 h-1 rounded-full bg-gray-400" />
@@ -82,6 +107,26 @@ export default function TaskCard({ task, index, onEdit }) {
           {/* Descripción */}
           {task.description && (
             <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{task.description}</p>
+          )}
+
+          {/* Imagen */}
+          {task.imageUrl && (
+            <div className="mt-2 relative group">
+              <img
+                src={task.imageUrl}
+                alt={task.title}
+                className="w-full h-20 object-cover rounded-lg border border-gray-200 transition group-hover:shadow-md group-hover:border-gray-300"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(task.imageUrl, '_blank');
+                }}
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center">
+                <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition bg-black/50 px-2 py-1 rounded-md">
+                  Ver imagen
+                </span>
+              </div>
+            </div>
           )}
 
           {/* Etiquetas */}
@@ -122,6 +167,36 @@ export default function TaskCard({ task, index, onEdit }) {
               </span>
             )}
           </div>
+
+          {/* Botones de movimiento (mobile: visible, desktop: hover) */}
+          {(canMoveLeft || canMoveRight) && (
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+            <div className="flex gap-1">
+              {canMoveLeft && (
+                <button
+                  onClick={(e) => handleClick(e, prevStatus)}
+                  className="text-[10px] font-medium px-2 py-1 rounded-md transition
+                    text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700
+                    sm:opacity-0 sm:group-hover/card:opacity-100"
+                >
+                  {'\u2190'} {prevLabel || prevStatus}
+                </button>
+              )}
+            </div>
+            <div className="flex gap-1">
+              {canMoveRight && (
+                <button
+                  onClick={(e) => handleClick(e, nextStatus)}
+                  className="text-[10px] font-medium px-2 py-1 rounded-md transition
+                    text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700
+                    sm:opacity-0 sm:group-hover/card:opacity-100"
+                >
+                  {nextLabel || nextStatus} {'\u2192'}
+                </button>
+              )}
+            </div>
+          </div>
+          )}
         </div>
       )}
     </Draggable>

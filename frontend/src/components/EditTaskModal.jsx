@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import useKanbanStore from '../store/kanbanStore';
 import DatePickerModal from './DatePickerModal';
+import ImageUploadModal from './ImageUploadModal';
 
 function parseLocalDate(str) {
   if (!str) return new Date();
@@ -36,6 +37,8 @@ export default function EditTaskModal({ task, onClose }) {
   const [assigneeId, setAssigneeId] = useState(task.assignee?.id || '');
   const [users, setUsers] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [imageUrl, setImageUrl] = useState(task.imageUrl || '');
   const { token } = useKanbanStore();
   const titleRef = useRef(null);
 
@@ -75,7 +78,8 @@ export default function EditTaskModal({ task, onClose }) {
           priority,
           dueDate: dueDate || null,
           tags: tagsInput.trim(),
-          assigneeId: assigneeId || null
+          assigneeId: assigneeId || null,
+          imageUrl: imageUrl || null
         })
       });
       const updated = await res.json();
@@ -98,45 +102,45 @@ export default function EditTaskModal({ task, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Editar Tarea</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+          <h2 className="text-sm font-bold text-gray-900">Editar Tarea</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-2.5">
           {/* Título */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Título *</label>
+            <label className="block text-xs font-medium text-gray-600 mb-0.5">Título *</label>
             <input
               ref={titleRef}
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
             />
           </div>
 
           {/* Descripción */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+            <label className="block text-xs font-medium text-gray-600 mb-0.5">Descripción</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
-              rows={3}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
+              rows={2}
             />
           </div>
 
           {/* Prioridad y Fecha - lado a lado */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+              <label className="block text-xs font-medium text-gray-600 mb-0.5">Prioridad</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
               >
                 {PRIORITIES.map((p) => (
                   <option key={p.value} value={p.value}>{p.label}</option>
@@ -144,12 +148,12 @@ export default function EditTaskModal({ task, onClose }) {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha límite</label>
+              <label className="block text-xs font-medium text-gray-600 mb-0.5">Fecha límite</label>
               <input
                 type="text" readOnly value={dueDate ? parseLocalDate(dueDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
                 onClick={() => setShowDatePicker(true)}
-                placeholder="Seleccionar fecha"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer bg-white"
+                placeholder="Seleccionar"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer bg-white"
               />
               {showDatePicker && (
                 <DatePickerModal
@@ -163,38 +167,70 @@ export default function EditTaskModal({ task, onClose }) {
 
           {/* Etiquetas */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Etiquetas</label>
+            <label className="block text-xs font-medium text-gray-600 mb-0.5">Etiquetas</label>
             <input
               type="text"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              placeholder="Ej: frontend, bug, urgente (separadas por coma)"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              placeholder="frontend, bug, urgente"
             />
           </div>
 
-          {/* Asignar a */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Asignar a</label>
-            <select
-              value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
-            >
-              <option value="">Sin asignar</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
-              ))}
-            </select>
+          {/* Asignar a + Imagen - misma fila alineada */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-0.5">Asignar a</label>
+              <select
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
+              >
+                <option value="">{'\u{1F464}'} Sin asignar</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="block text-xs font-medium text-gray-600 mb-0.5">Imagen</label>
+              <div className="flex items-center gap-2 flex-1 min-h-[36px]">
+                <button
+                  type="button"
+                  onClick={() => setShowImageUpload(true)}
+                  className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition h-[34px]"
+                >
+                  <span>{'\u{1F4F7}'}</span>
+                  Img
+                </button>
+                {imageUrl && (
+                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                    {'\u2705'}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          {showImageUpload && (
+            <ImageUploadModal
+              taskId={task.id}
+              currentImage={imageUrl}
+              onSave={(url) => {
+                setImageUrl(url);
+                setShowImageUpload(false);
+              }}
+              onClose={() => setShowImageUpload(false)}
+            />
+          )}
+
+          <div className="flex gap-2 pt-1">
             <button type="button" onClick={handleDelete}
-              className="py-2.5 px-4 border border-red-300 rounded-lg text-red-600 font-medium hover:bg-red-50 transition">Eliminar</button>
+              className="py-2 px-3 text-xs border border-red-200 rounded-lg text-red-600 font-medium hover:bg-red-50 transition">Eliminar</button>
             <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition">Cancelar</button>
+              className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">Cancelar</button>
             <button type="submit" disabled={saving}
-              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg transition">
+              className="flex-1 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg transition">
               {saving ? 'Guardando...' : 'Guardar'}</button>
           </div>
         </form>

@@ -28,13 +28,13 @@ const columnColors = {
   }
 };
 
-export default function Column({ column, onEditTask }) {
+export default function Column({ column, onEditTask, onMoveTask }) {
   const colors = columnColors[column.id] || columnColors.TODO;
 
   return (
-    <div className={`flex flex-col rounded-2xl ${colors.bg} flex-1 min-w-[220px] max-h-full`}>
+    <div className={`flex flex-col rounded-2xl ${colors.bg} w-[80vw] h-full sm:w-auto sm:flex-1 sm:min-w-[220px] sm:max-h-full shrink-0 snap-start`}>
       {/* Header */}
-      <div className={`flex items-center justify-between px-5 py-3.5 rounded-t-2xl ${colors.header}`}>
+      <div className={`flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3.5 rounded-t-2xl ${colors.header}`}>
         <div className="flex items-center gap-2.5">
           <span className={`w-3 h-3 rounded-full ${colors.dot}`} />
           <h2 className={`text-sm font-bold uppercase tracking-wide ${colors.text}`}>
@@ -52,7 +52,7 @@ export default function Column({ column, onEditTask }) {
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex-1 p-3 space-y-3 overflow-y-auto column-scroll min-h-[120px] transition-colors ${
+            className={`flex-1 p-3 space-y-2 sm:space-y-3 overflow-y-auto column-scroll min-h-[80px] sm:min-h-[120px] transition-colors ${
               snapshot.isDraggingOver ? 'bg-black/5' : ''
             }`}
           >
@@ -62,7 +62,7 @@ export default function Column({ column, onEditTask }) {
               </div>
             )}
             {column.tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} />
+              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} />
             ))}
             {provided.placeholder}
           </div>

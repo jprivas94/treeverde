@@ -5,6 +5,18 @@ import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import Board from './components/Board';
 import WelcomeModal from './components/WelcomeModal';
+import ErrorBoundary from './components/ErrorBoundary';
+import logger from './services/logger';
+
+// Capturar errores globales no controlados
+if (typeof window !== 'undefined') {
+  window.onerror = function (msg, source, line, col, error) {
+    logger.error('Error global no capturado', error || msg, { source, line, col });
+  };
+  window.addEventListener('unhandledrejection', function (e) {
+    logger.error('Promesa no manejada', e.reason, {});
+  });
+}
 
 export default function App() {
   const token = useKanbanStore((s) => s.token);
@@ -48,10 +60,10 @@ export default function App() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <Board />
       {showWelcome && <WelcomeModal />}
-    </>
+    </ErrorBoundary>
   );
 }
 

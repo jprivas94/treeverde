@@ -60,23 +60,31 @@ router.patch('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    if (!['TODO', 'IN_PROGRESS', 'DONE'].includes(status)) {
-      return res.status(400).json({ error: 'Estado inválido. Use: TODO, IN_PROGRESS, DONE' });
+    if (!['TODO', 'IN_PROGRESS', 'DONE', 'ARCHIVED'].includes(status)) {
+      return res.status(400).json({ error: 'Estado inválido. Use: TODO, IN_PROGRESS, DONE, ARCHIVED' });
     }
 
     const updateData = { status };
 
-    // Solo registrar completedAt si realmente está cambiando a DONE,
-    // no cuando se reordena dentro de la misma columna
-    if (status === 'DONE') {
+    // Registrar completedAt la primera vez y archivedAt cuando se archiva
+    if (status === 'DONE' || status === 'ARCHIVED') {
+      // Solo consultar status actual (sin archivedAt para evitar errores si la
+      // migracion de BD con esa columna no se ha aplicado aun)
       const currentTask = await prisma.task.findUnique({
         where: { id },
-        select: { status: true }
+        select: { status: true, completedAt: true }
       });
-      if (currentTask && currentTask.status !== 'DONE') {
-        updateData.completedAt = new Date();
+      if (currentTask) {
+        const isNewlyCompleted =
+          currentTask.status !== 'DONE' && currentTask.status !== 'ARCHIVED';
+        if (isNewlyCompleted) {
+          updateData.completedAt = new Date();
+        }
+        // TODO: restaurar updateData.archivedAt = new Date() cuando se aplique
+        // la migracion 20260724000000_add_archived_at en produccion
       }
-    } else if (status !== 'DONE') {
+    } else {
+      // Limpiar solo completedAt al mover a TODO o IN_PROGRESS
       updateData.completedAt = null;
     }
 
@@ -102,7 +110,7 @@ router.patch('/:id/status', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, assigneeId, status, priority, dueDate, tags } = req.body;
+    const { title, description, assigneeId, status, priority, dueDate, tags, imageUrl } = req.body;
     const data = {};
     if (title !== undefined) data.title = title.trim();
     if (description !== undefined) data.description = description.trim();
@@ -111,6 +119,7 @@ router.put('/:id', async (req, res) => {
     if (priority !== undefined) data.priority = priority;
     if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
     if (tags !== undefined) data.tags = tags;
+    if (imageUrl !== undefined) data.imageUrl = imageUrl || null;
 
     const task = await prisma.task.update({
       where: { id },

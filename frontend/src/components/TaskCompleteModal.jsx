@@ -1,6 +1,14 @@
+import { useEffect } from 'react';
+
 export default function TaskCompleteModal({ task, onCancel }) {
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
   const completedAt = task.completedAt ? new Date(task.completedAt) : null;
+
+  // Cerrar automaticamente despues de 5 segundos
+  useEffect(() => {
+    const timer = setTimeout(onCancel, 5000);
+    return () => clearTimeout(timer);
+  }, [onCancel]);
 
   let completedEarly = false;
   let completedLate = false;

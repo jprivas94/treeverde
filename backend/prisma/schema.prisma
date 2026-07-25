@@ -27,6 +27,8 @@ model Task {
   priority    String    @default("MEDIUM")
   dueDate     DateTime?
   completedAt DateTime?
+  archivedAt  DateTime?
+  imageUrl    String?
   tags        String    @default("")
   assigneeId  String?
   creatorId   String?
