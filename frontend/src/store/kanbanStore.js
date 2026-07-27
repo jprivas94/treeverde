@@ -142,8 +142,10 @@ const useKanbanStore = create((set, get) => ({
     })),
 
   // ─── UI ────────────────────────────────────
+  showWelcome: false,
   setLoading: (loading) => set({ loading }),
-  setError: (error) => set({ error })
+  setError: (error) => set({ error }),
+  setShowWelcome: (showWelcome) => set({ showWelcome })
 }));
 
 export default useKanbanStore;

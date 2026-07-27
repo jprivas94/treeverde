@@ -412,10 +412,10 @@ export default function Board() {
             </div>
           </div>
           </DragDropContext>
-
-          {showModal && <CreateTaskModal onClose={() => setShowModal(false)} />}
         </>
       )}
+
+      {showModal && <CreateTaskModal onClose={() => setShowModal(false)} />}
 
       {editingTask && <EditTaskModal task={editingTask} onClose={() => setEditingTask(null)} onViewImage={handleViewImage} />}
       {viewingTask && (

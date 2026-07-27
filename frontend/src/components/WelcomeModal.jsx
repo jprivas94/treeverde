@@ -1,7 +1,15 @@
+import { useEffect } from 'react';
 import useKanbanStore from '../store/kanbanStore';
 
 export default function WelcomeModal() {
   const user = useKanbanStore((s) => s.user);
+  const setShowWelcome = useKanbanStore((s) => s.setShowWelcome);
+
+  // Auto-dismiss después de 2.5s con animación de salida
+  useEffect(() => {
+    const timer = setTimeout(() => setShowWelcome(false), 2500);
+    return () => clearTimeout(timer);
+  }, [setShowWelcome]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center animate-fade-in">
@@ -22,7 +30,7 @@ export default function WelcomeModal() {
         <p className="text-gray-500 text-sm leading-relaxed">
           Has iniciado sesión correctamente.
           <br />
-          Estamos cargando tu tablero de tareas...
+          Cargando tu tablero de tareas...
         </p>
 
         {/* Loading dots */}
@@ -31,6 +39,10 @@ export default function WelcomeModal() {
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '150ms' }} />
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
+
+        <p className="text-xs text-gray-400 mt-4 animate-pulse">
+          Redirigiendo al tablero...
+        </p>
       </div>
     </div>
   );
