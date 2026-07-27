@@ -46,7 +46,7 @@ function isOverdue(dateStr) {
   return d < new Date(new Date().toDateString());
 }
 
-export default function TaskCard({ task, index, onEdit, onMove }) {
+export default function TaskCard({ task, index, onEdit, onMove, onViewImage }) {
   const priority = priorityConfig[task.priority] || priorityConfig.MEDIUM;
   const dueDateStr = formatDate(task.dueDate);
   const overdue = isOverdue(task.dueDate);
@@ -104,24 +104,57 @@ export default function TaskCard({ task, index, onEdit, onMove }) {
           {/* Título */}
           <h3 className="text-sm font-semibold text-gray-900 leading-snug">{task.title}</h3>
 
-          {/* Descripción */}
+          {/* Descripción (completa, sin truncar) */}
           {task.description && (
-            <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{task.description}</p>
+            <p className="text-xs text-gray-500 mt-1.5 whitespace-pre-wrap">{task.description}</p>
           )}
+
+          {/* Progreso de sub-tareas */}
+          {(() => {
+            let stArr = [];
+            try {
+              stArr = typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : (task.subtasks || []);
+            } catch { stArr = []; }
+            if (!Array.isArray(stArr)) stArr = [];
+            const total = stArr.length;
+            if (total === 0) return null;
+            const done = stArr.filter((st) => st.completed).length;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            return (
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                  <span>{'\u{1F4CB}'} Sub-tareas</span>
+                  <span className="font-medium">{done}/{total}</span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: pct + '%',
+                      backgroundColor: pct === 100 ? '#10B981' : pct > 0 ? '#F59E0B' : '#E5E7EB'
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Imagen */}
           {task.imageUrl && (
-            <div className="mt-2 relative group">
+            <div
+              className="mt-2 relative group cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewImage?.(task);
+              }}
+            >
               <img
                 src={task.imageUrl}
                 alt={task.title}
-                className="w-full h-20 object-cover rounded-lg border border-gray-200 transition group-hover:shadow-md group-hover:border-gray-300"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(task.imageUrl, '_blank');
-                }}
+                className="w-full max-h-28 object-cover rounded-lg border border-gray-200 transition group-hover:shadow-md group-hover:border-gray-300"
+                draggable={false}
               />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center pointer-events-none">
                 <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition bg-black/50 px-2 py-1 rounded-md">
                   Ver imagen
                 </span>
@@ -143,23 +176,45 @@ export default function TaskCard({ task, index, onEdit, onMove }) {
             </div>
           )}
 
-          {/* Footer: Asignado + Fecha */}
+          {/* Footer: Creador + Asignado + Fecha */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-            <div className="flex items-center gap-2">
-              {task.assignee ? (
-                <>
-                  <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-bold">
-                    {task.assignee.name.charAt(0).toUpperCase()}
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Creador */}
+              {task.creator && (
+                <span className="flex items-center gap-1 text-[10px] text-gray-400" title={`Creado por ${task.creator.name}`}>
+                  <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold overflow-hidden shrink-0">
+                    {task.creator.profileImage ? (
+                      <img src={task.creator.profileImage} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="w-full h-full flex items-center justify-center bg-indigo-400">
+                        {task.creator.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
                   </div>
-                  <span className="text-xs text-gray-600">{task.assignee.name}</span>
-                </>
-              ) : (
-                <span className="text-xs text-gray-400 italic">Sin asignar</span>
+                  <span className="truncate max-w-[60px]">{task.creator.name}</span>
+                </span>
               )}
+              {/* Asignado */}
+              {task.assignee ? (
+                <span className="flex items-center gap-1 text-[10px] text-gray-500" title={`Asignado a ${task.assignee.name}`}>
+                  <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold overflow-hidden shrink-0">
+                    {task.assignee.profileImage ? (
+                      <img src={task.assignee.profileImage} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="w-full h-full flex items-center justify-center bg-emerald-500">
+                        {task.assignee.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="truncate max-w-[60px]">{task.assignee.name}</span>
+                </span>
+              ) : task.creator ? (
+                <span className="text-[10px] text-gray-400 italic">Sin asignar</span>
+              ) : null}
             </div>
 
             {dueDateStr && (
-              <span className={`text-[11px] font-medium flex items-center gap-1 ${
+              <span className={`text-[11px] font-medium flex items-center gap-1 shrink-0 ${
                 overdue ? 'text-red-500' : 'text-gray-400'
               }`}>
                 <span>{overdue ? '⚠️' : '📅'}</span>

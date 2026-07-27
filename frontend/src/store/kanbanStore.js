@@ -71,6 +71,48 @@ const useKanbanStore = create((set, get) => ({
 
   // ─── Users ─────────────────────────────────
   setUsers: (users) => set({ users }),
+  updateUser: (updates) =>
+    set((s) => {
+      if (!s.user) return {};
+      const newUser = { ...s.user, ...updates };
+
+      // Propagar nombre y foto a todas las tareas donde el usuario es asignado o creador
+      const updateAssignee = (t) => {
+        if (t.assignee && t.assignee.id === s.user.id) {
+          return {
+            ...t,
+            assignee: {
+              ...t.assignee,
+              name: updates.name || t.assignee.name,
+              profileImage: updates.profileImage !== undefined ? updates.profileImage : t.assignee.profileImage,
+            },
+          };
+        }
+        return t;
+      };
+
+      const updateCreator = (t) => {
+        if (t.creator && t.creator.id === s.user.id) {
+          return {
+            ...t,
+            creator: {
+              ...t.creator,
+              name: updates.name || t.creator.name,
+              profileImage: updates.profileImage !== undefined ? updates.profileImage : t.creator.profileImage,
+            },
+          };
+        }
+        return t;
+      };
+
+      const updateTask = (t) => updateCreator(updateAssignee(t));
+
+      return {
+        user: newUser,
+        tasks: s.tasks.map(updateTask),
+        archivedTasks: s.archivedTasks.map(updateTask),
+      };
+    }),
 
   // ─── Columns (agrupadas por status) ────────
   getColumns: () => {
@@ -89,13 +131,15 @@ const useKanbanStore = create((set, get) => ({
     }));
   },
 
-  // ─── Welcome Modal ─────────────────────────
-  showWelcome: false,
-  setShowWelcome: (show) => set({ showWelcome: show }),
-
-  // ─── Welcome Modal ─────────────────────────
-  showWelcome: false,
-  setShowWelcome: (show) => set({ showWelcome: show }),
+  // ─── Notifications ─────────────────────────
+  notifications: [],
+  unreadCount: 0,
+  setNotifications: (notifications, unreadCount) => set({ notifications, unreadCount }),
+  markAllRead: () =>
+    set((s) => ({
+      notifications: s.notifications.map((n) => ({ ...n, read: true })),
+      unreadCount: 0
+    })),
 
   // ─── UI ────────────────────────────────────
   setLoading: (loading) => set({ loading }),

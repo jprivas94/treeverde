@@ -9,7 +9,7 @@ function getToken() {
 const MAX_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-export default function ImageUploadModal({ taskId, currentImage, onSave, onClose }) {
+export default function ImageUploadModal({ currentImage, onSave, onClose }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(currentImage || null);
   const [uploading, setUploading] = useState(false);
@@ -54,46 +54,40 @@ export default function ImageUploadModal({ taskId, currentImage, onSave, onClose
     setUploading(true);
     setError('');
     setProgress(20);
-
     try {
       const token = getToken();
-
-      const presignRes = await fetch(API_BASE + '/upload/presign', {
+      const signRes = await fetch(API_BASE + '/upload/sign', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + token,
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          contentType: file.type,
-          taskId,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ fileName: file.name, prefix: 'tasks', imageType: 'task' }),
       });
-
-      if (!presignRes.ok) {
-        const errData = await presignRes.json().catch(() => ({}));
+      if (!signRes.ok) {
+        const errData = await signRes.json().catch(() => ({}));
         throw new Error(errData.error || 'Error al preparar la subida');
       }
-
-      const { uploadUrl, publicUrl } = await presignRes.json();
-      setProgress(50);
-
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
+      const { cloudName, apiKey, signature, timestamp, folder, transformations } = await signRes.json();
+      setProgress(40);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', apiKey);
+      formData.append('timestamp', String(timestamp));
+      formData.append('signature', signature);
+      formData.append('folder', folder);
+      formData.append('transformation', transformations);
+      const uploadRes = await fetch('https://api.cloudinary.com/v1_1/' + cloudName + '/image/upload', {
+        method: 'POST',
+        body: formData,
       });
-
       if (!uploadRes.ok) {
-        throw new Error('Error al subir la imagen');
+        const errText = await uploadRes.text().catch(() => 'Error desconocido');
+        throw new Error('Error al subir la imagen: ' + errText);
       }
-
+      const uploadData = await uploadRes.json();
+      const publicUrl = uploadData.secure_url;
       setProgress(80);
       await onSave(publicUrl);
       setUploadedUrl(publicUrl);
       setProgress(100);
-
       setTimeout(function () { onClose(); }, 800);
     } catch (err) {
       console.error('[Treeverde] Error al subir imagen:', err);

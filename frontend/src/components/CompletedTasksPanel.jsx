@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import ImageViewModal from './ImageViewModal';
 
 function formatDate(dateStr) {
   if (!dateStr) return null;
@@ -58,7 +59,7 @@ const priorityConfig = {
   CRITICAL: { label: 'Crítica', class: 'text-red-600 bg-red-100' },
 };
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 5;
 
 const PRIORITY_FILTERS = [
   { value: '', label: 'Todas' },
@@ -82,6 +83,24 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
   const [priorityFilter, setPriorityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
+  const [viewingImageIndex, setViewingImageIndex] = useState(null);
+
+  // Lista de imágenes de todas las tareas del historial
+  const historyImagesList = useMemo(() => {
+    const allDone = [
+      ...tasks.filter((t) => t.status === 'DONE' || t.status === 'ARCHIVED'),
+      ...(archivedTasks || []),
+    ];
+    // Eliminar duplicados por id
+    const seen = new Set();
+    return allDone
+      .filter((t) => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return !!t.imageUrl;
+      })
+      .map((t) => ({ imageUrl: t.imageUrl, title: t.title }));
+  }, [tasks, archivedTasks]);
 
   const { completedData, filteredCount } = useMemo(() => {
     const completedTasks = tasks.filter(
@@ -265,6 +284,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">                    <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tarea</th>
                   <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Creador</th>
+                  <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Asignado</th>
                   <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Prioridad</th>
                   <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Fecha limite</th>
                   <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Completado</th>
@@ -294,8 +314,25 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
                             task.priority === 'HIGH' ? 'bg-orange-400' :
                             task.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-green-400'
                           }`} />
-                          <div className="min-w-0">
-                            <span className="text-xs sm:text-sm font-medium text-gray-900">{task.title}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs sm:text-sm font-medium text-gray-900">{task.title}</span>
+                              {task.imageUrl && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const idx = historyImagesList.findIndex(
+                                      (img) => img.imageUrl === task.imageUrl
+                                    );
+                                    if (idx !== -1) setViewingImageIndex(idx);
+                                  }}
+                                  className="shrink-0 text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded transition"
+                                  title="Ver imagen"
+                                >
+                                  👁️ Ver imagen
+                                </button>
+                              )}
+                            </div>
                             {task.description && (
                               <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 line-clamp-1">{task.description}</p>
                             )}
@@ -309,6 +346,18 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
                               {task.creator.name.charAt(0).toUpperCase()}
                             </span>
                             {task.creator.name}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] sm:text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 sm:px-5 py-2.5 sm:py-3 hidden sm:table-cell">
+                        {task.assignee ? (
+                          <span className="text-[11px] sm:text-xs text-gray-500 flex items-center gap-1">
+                            <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-emerald-100 flex items-center justify-center text-[7px] sm:text-[8px] font-bold text-emerald-600">
+                              {task.assignee.name.charAt(0).toUpperCase()}
+                            </span>
+                            {task.assignee.name}
                           </span>
                         ) : (
                           <span className="text-[11px] sm:text-xs text-gray-400">—</span>
@@ -355,62 +404,77 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
         </div>
 
         {/* Paginador */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-1 pb-2 sm:pb-4">
+        <div className="flex flex-col items-center gap-2 pb-4">
+          {/* Indicador de página */}
+          <div className="text-xs text-gray-500 font-medium">
+            Página {safePage} de {totalPages}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {/* Anterior */}
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage <= 1}
-              className="px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-sm"
             >
-              <span className="sm:hidden">{'\u00AB'}</span>
-              <span className="hidden sm:inline">{'\u00AB'} Anterior</span>
+              {'\u2190'} Anterior
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
-              const isCurrent = num === safePage;
-              // Mostrar solo primeras 2, ultimas 2, y pagina actual con vecinos
-              const show =
-                num <= 2 ||
-                num >= totalPages - 1 ||
-                Math.abs(num - safePage) <= 1;
-              const ellipsisPrev = num === 3 && safePage > 4;
-              const ellipsisNext = num === totalPages - 2 && safePage < totalPages - 3;
 
-              if (!show) {
-                if (ellipsisPrev || ellipsisNext) {
-                  return (
-                    <span key={num} className="px-1 sm:px-2 py-1 text-[11px] sm:text-xs text-gray-400">
-                      ...
-                    </span>
-                  );
+            {/* Números de página */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
+                const isCurrent = num === safePage;
+                const show = totalPages <= 10 ||
+                  num <= 2 ||
+                  num >= totalPages - 1 ||
+                  Math.abs(num - safePage) <= 1;
+                const isEllipsisPrev = num === 3 && safePage > 4 && totalPages > 10;
+                const isEllipsisNext = num === totalPages - 2 && safePage < totalPages - 3 && totalPages > 10;
+
+                if (!show) {
+                  if (isEllipsisPrev || isEllipsisNext) {
+                    return (
+                      <span key={num} className="px-1 py-1 text-xs text-gray-400 select-none">...</span>
+                    );
+                  }
+                  return null;
                 }
-                return null;
-              }
 
-              return (
-                <button
-                  key={num}
-                  onClick={() => setPage(num)}
-                  className={`w-6 h-6 sm:w-8 sm:h-8 text-[10px] sm:text-xs font-semibold rounded-lg transition ${
-                    isCurrent
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {num}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={num}
+                    onClick={() => setPage(num)}
+                    className={`min-w-[32px] h-8 text-xs font-bold rounded-lg transition shadow-sm ${
+                      isCurrent
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 hover:border-gray-400'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Siguiente */}
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage >= totalPages}
-              className="px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-sm"
             >
-              <span className="sm:hidden">{'\u00BB'}</span>
-              <span className="hidden sm:inline">Siguiente {'\u00BB'}</span>
+              Siguiente {'\u2192'}
             </button>
           </div>
-        )}
+        </div>
       </div>
+
+      {viewingImageIndex !== null && (
+        <ImageViewModal
+          images={historyImagesList}
+          currentIndex={viewingImageIndex}
+          onClose={() => setViewingImageIndex(null)}
+          onNavigate={(idx) => setViewingImageIndex(idx)}
+        />
+      )}
     </div>
   );
 }

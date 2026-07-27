@@ -28,11 +28,18 @@ const columnColors = {
   }
 };
 
-export default function Column({ column, onEditTask, onMoveTask }) {
+export default function Column({ column, onEditTask, onMoveTask, onViewImage, fixedHeight, todoRef }) {
   const colors = columnColors[column.id] || columnColors.TODO;
 
   return (
-    <div className={`flex flex-col rounded-2xl ${colors.bg} w-[80vw] h-full sm:w-auto sm:flex-1 sm:min-w-[220px] sm:max-h-full shrink-0 snap-start`}>
+    <div
+      ref={todoRef}
+      style={fixedHeight ? { minHeight: fixedHeight + 'px' } : undefined}
+      className={`flex flex-col rounded-2xl ${colors.bg} w-[80vw] h-full sm:max-h-full shrink-0 snap-start ${
+        column.id === 'TODO'
+          ? 'sm:w-72 sm:min-w-[280px] sm:flex-none'
+          : 'sm:w-auto sm:flex-1 sm:min-w-[200px]'
+      }`}>
       {/* Header */}
       <div className={`flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3.5 rounded-t-2xl ${colors.header}`}>
         <div className="flex items-center gap-2.5">
@@ -62,7 +69,7 @@ export default function Column({ column, onEditTask, onMoveTask }) {
               </div>
             )}
             {column.tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} />
+              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} onViewImage={onViewImage} />
             ))}
             {provided.placeholder}
           </div>

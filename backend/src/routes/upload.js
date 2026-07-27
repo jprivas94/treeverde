@@ -1,84 +1,73 @@
 import { Router } from 'express';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import cloudinary from 'cloudinary';
 import authenticate from '../middleware/auth.js';
-import crypto from 'crypto';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
-// ─── Configuracion de Cloudflare R2 ──────────────
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
-const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY;
-const R2_SECRET_KEY = process.env.R2_SECRET_KEY;
-const R2_BUCKET = process.env.R2_BUCKET || 'treeverde-images';
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
+// ─── Configuracion de Cloudinary ────────────────
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
-let s3Client = null;
-
-function getS3Client() {
-  if (!s3Client && R2_ACCOUNT_ID && R2_ACCESS_KEY && R2_SECRET_KEY) {
-    s3Client = new S3Client({
-      region: 'auto',
-      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: R2_ACCESS_KEY,
-        secretAccessKey: R2_SECRET_KEY,
-      },
-    });
-  }
-  return s3Client;
+// Configurar el SDK una sola vez
+if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
+  cloudinary.v2.config({
+    cloud_name: CLOUDINARY_CLOUD_NAME,
+    api_key: CLOUDINARY_API_KEY,
+    api_secret: CLOUDINARY_API_SECRET,
+  });
 }
 
 // Todas las rutas requieren autenticacion
 router.use(authenticate);
 
-// POST /api/upload/presign — genera URL prefirmada para subir imagen directamente desde el navegador a R2
-router.post('/presign', async (req, res) => {
+// POST /api/upload/sign — genera firma para subir imagen desde el navegador a Cloudinary
+router.post('/sign', async (req, res) => {
   try {
-    const client = getS3Client();
-
-    if (!client) {
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
       return res.status(501).json({
-        error: 'Cloudflare R2 no esta configurado',
-        hint: 'Configura las variables de entorno: R2_ACCOUNT_ID, R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET',
+        error: 'Cloudinary no esta configurado',
+        hint: 'Configura las variables de entorno: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET',
       });
     }
 
-    const { fileName, contentType, taskId } = req.body;
+    const { fileName, prefix, imageType } = req.body;
 
-    if (!fileName || !contentType) {
-      return res.status(400).json({ error: 'fileName y contentType son requeridos' });
+    if (!fileName) {
+      return res.status(400).json({ error: 'fileName es requerido' });
     }
 
-    if (!contentType.startsWith('image/')) {
-      return res.status(400).json({ error: 'Solo se permiten imagenes' });
-    }
+    const folder = prefix || 'tasks';
+    const timestamp = Math.round(Date.now() / 1000);
 
-    const ext = fileName.split('.').pop() || 'png';
-    const uniqueName = `tasks/${taskId || 'general'}/${crypto.randomUUID()}.${ext}`;
+    // Transformaciones según tipo de imagen
+    const transformations = imageType === 'avatar'
+      ? 'w_200,h_200,c_fill,f_auto,q_auto'
+      : 'w_800,c_limit,f_auto,q_auto';
 
-    const command = new PutObjectCommand({
-      Bucket: R2_BUCKET,
-      Key: uniqueName,
-      ContentType: contentType,
-    });
+    // Generar firma para upload firmado (incluye la transformación)
+    const paramsToSign = {
+      timestamp,
+      folder,
+      transformation: transformations,
+    };
 
-    const signedUrl = await getSignedUrl(client, command, { expiresIn: 3600 });
-
-    let publicUrl = '';
-    if (R2_PUBLIC_URL) {
-      publicUrl = `${R2_PUBLIC_URL}/${uniqueName}`;
-    } else {
-      publicUrl = `https://${R2_BUCKET}.${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${uniqueName}`;
-    }
+    const signature = cloudinary.v2.utils.api_sign_request(
+      paramsToSign,
+      CLOUDINARY_API_SECRET
+    );
 
     res.json({
-      uploadUrl: signedUrl,
-      publicUrl,
-      key: uniqueName,
+      cloudName: CLOUDINARY_CLOUD_NAME,
+      apiKey: CLOUDINARY_API_KEY,
+      signature,
+      timestamp,
+      folder,
+      transformations,
     });
   } catch (err) {
-    console.error('[Treeverde] Error al generar URL de upload:', err);
+    logger.error('Error al generar firma de Cloudinary', err, { userId: req.userId, fileName: req.body?.fileName });
     res.status(500).json({ error: 'Error al preparar la subida de imagen' });
   }
 });
