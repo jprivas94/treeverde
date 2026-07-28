@@ -202,6 +202,15 @@ export default function ImageUploadModal({ currentImage, onSave, onClose }) {
                 Subir imagen
               </button>
             )}
+            {uploading && (
+              <button
+                disabled
+                className="flex-1 py-2 text-xs font-semibold text-white bg-emerald-500 rounded-lg flex items-center justify-center gap-1.5 opacity-80 cursor-wait"
+              >
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Subiendo
+              </button>
+            )}
             {!file && !uploadedUrl && currentImage && (
               <div className="flex-1 py-2 text-xs text-gray-400 text-center">
                 Imagen actual

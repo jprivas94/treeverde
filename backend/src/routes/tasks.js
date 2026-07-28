@@ -457,8 +457,8 @@ router.delete('/:id', async (req, res) => {
     if (!existingTask) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
-    if (existingTask.creatorId !== req.userId && existingTask.assigneeId !== req.userId) {
-      return res.status(403).json({ error: 'No tienes permiso para eliminar esta tarea' });
+    if (existingTask.creatorId !== req.userId) {
+      return res.status(403).json({ error: 'Solo el creador de la tarea puede eliminarla' });
     }
 
     await prisma.task.delete({ where: { id } });

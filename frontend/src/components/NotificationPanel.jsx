@@ -89,7 +89,13 @@ export default function NotificationPanel() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50 animate-fade-scale-in">
+        <>
+        {/* Overlay móvil/tablet */}
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={() => setOpen(false)}
+        />
+        <div className="fixed md:absolute z-50 inset-x-4 md:inset-x-auto top-1/2 md:top-full md:mt-2 -translate-y-1/2 md:translate-y-0 mx-auto md:mx-0 w-auto md:w-80 max-w-sm md:max-w-none bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-fade-scale-in">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-900">Notificaciones</h3>
             <span className="text-[10px] text-gray-400">{notifications.length} total</span>
@@ -150,6 +156,7 @@ export default function NotificationPanel() {
             )}
           </div>
         </div>
+        </>
       )}
     </div>
   );
