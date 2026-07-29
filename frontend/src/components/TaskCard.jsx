@@ -24,12 +24,19 @@ const priorityConfig = {
 const STATUS_ORDER = ['TODO', 'IN_PROGRESS', 'DONE', 'ARCHIVED'];
 
 const transitionLabels = {
-  'TODO->IN_PROGRESS': 'En progreso',
-  'IN_PROGRESS->TODO': 'Atrás',
+  'TODO->IN_PROGRESS': 'En Progreso',
+  'IN_PROGRESS->TODO': 'Por Hacer',
   'IN_PROGRESS->DONE': 'Revisión',
-  'DONE->IN_PROGRESS': 'Atrás',
+  'DONE->IN_PROGRESS': 'En Progreso',
   'DONE->ARCHIVED': 'Terminar',
   'ARCHIVED->DONE': 'Restaurar',
+};
+
+const columnBtnColors = {
+  TODO: { bg: 'bg-amber-100', text: 'text-amber-700', hoverBg: 'hover:bg-amber-200', hoverText: 'hover:text-amber-800' },
+  IN_PROGRESS: { bg: 'bg-blue-100', text: 'text-blue-700', hoverBg: 'hover:bg-blue-200', hoverText: 'hover:text-blue-800' },
+  DONE: { bg: 'bg-emerald-100', text: 'text-emerald-700', hoverBg: 'hover:bg-emerald-200', hoverText: 'hover:text-emerald-800' },
+  ARCHIVED: { bg: 'bg-red-100', text: 'text-red-700', hoverBg: 'hover:bg-red-200', hoverText: 'hover:text-red-800' },
 };
 
 function formatDate(dateStr) {
@@ -46,7 +53,7 @@ function isOverdue(dateStr) {
   return d < new Date(new Date().toDateString());
 }
 
-export default function TaskCard({ task, index, onEdit, onMove, onViewImage }) {
+export default function TaskCard({ task, index, onEdit, onMove, onViewImage, isSharedUser }) {
   const priority = priorityConfig[task.priority] || priorityConfig.MEDIUM;
   const dueDateStr = formatDate(task.dueDate);
   const overdue = isOverdue(task.dueDate);
@@ -139,28 +146,51 @@ export default function TaskCard({ task, index, onEdit, onMove, onViewImage }) {
             );
           })()}
 
-          {/* Imagen */}
-          {task.imageUrl && (
-            <div
-              className="mt-2 relative group cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewImage?.(task);
-              }}
-            >
-              <img
-                src={task.imageUrl}
-                alt={task.title}
-                className="w-full max-h-28 object-cover rounded-lg border border-gray-200 transition group-hover:shadow-md group-hover:border-gray-300"
-                draggable={false}
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center pointer-events-none">
-                <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition bg-black/50 px-2 py-1 rounded-md">
-                  Ver imagen
-                </span>
+          {/* Imágenes */}
+          {(() => {
+            const imgs = Array.isArray(task.images) ? task.images.filter(Boolean) : [];
+            if (imgs.length === 0) return null;
+            const maxShow = 2;
+            return (
+              <div className="mt-2">
+                <div className="flex gap-1.5 flex-wrap">
+                  {imgs.slice(0, maxShow).map((url, idx) => (
+                    <div
+                      key={idx}
+                      className="relative group cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewImage?.(task);
+                      }}
+                    >
+                      <img
+                        src={url}
+                        alt={`${task.title} ${idx + 1}`}
+                        className="w-14 h-14 object-cover rounded-lg border border-gray-200 transition group-hover:shadow-md group-hover:border-gray-300"
+                        draggable={false}
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center pointer-events-none">
+                        <span className="text-white text-[9px] font-medium opacity-0 group-hover:opacity-100 transition bg-black/50 px-1.5 py-0.5 rounded-md">
+                          Ver
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {imgs.length > maxShow && (
+                    <div
+                      className="w-14 h-14 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100 transition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewImage?.(task);
+                      }}
+                    >
+                      <span className="text-[10px] font-bold text-gray-500">+{imgs.length - maxShow}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Etiquetas */}
           {tags.length > 0 && (
@@ -223,32 +253,38 @@ export default function TaskCard({ task, index, onEdit, onMove, onViewImage }) {
             )}
           </div>
 
-          {/* Botones de movimiento (mobile: visible, desktop: hover) */}
-          {(canMoveLeft || canMoveRight) && (
+          {/* Botones de movimiento (mobile: visible, desktop: hover) — Oculto para usuarios compartidos */}
+          {!isSharedUser && (canMoveLeft || canMoveRight) && (
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
             <div className="flex gap-1">
-              {canMoveLeft && (
-                <button
-                  onClick={(e) => handleClick(e, prevStatus)}
-                  className="text-[10px] font-medium px-2 py-1 rounded-md transition
-                    text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700
-                    sm:opacity-0 sm:group-hover/card:opacity-100"
-                >
-                  {'\u2190'} {prevLabel || prevStatus}
-                </button>
-              )}
+              {canMoveLeft && (() => {
+                const c = columnBtnColors[prevStatus] || {};
+                return (
+                  <button
+                    onClick={(e) => handleClick(e, prevStatus)}
+                    className={`text-[10px] font-medium px-2 py-1 rounded-md transition
+                      ${c.bg} ${c.text} ${c.hoverBg} ${c.hoverText}
+                      sm:opacity-0 sm:group-hover/card:opacity-100`}
+                  >
+                    {'\u2190'} {prevLabel || prevStatus}
+                  </button>
+                );
+              })()}
             </div>
             <div className="flex gap-1">
-              {canMoveRight && (
-                <button
-                  onClick={(e) => handleClick(e, nextStatus)}
-                  className="text-[10px] font-medium px-2 py-1 rounded-md transition
-                    text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700
-                    sm:opacity-0 sm:group-hover/card:opacity-100"
-                >
-                  {nextLabel || nextStatus} {'\u2192'}
-                </button>
-              )}
+              {canMoveRight && (() => {
+                const c = columnBtnColors[nextStatus] || {};
+                return (
+                  <button
+                    onClick={(e) => handleClick(e, nextStatus)}
+                    className={`text-[10px] font-medium px-2 py-1 rounded-md transition
+                      ${c.bg} ${c.text} ${c.hoverBg} ${c.hoverText}
+                      sm:opacity-0 sm:group-hover/card:opacity-100`}
+                  >
+                    {nextLabel || nextStatus} {'\u2192'}
+                  </button>
+                );
+              })()}
             </div>
           </div>
           )}

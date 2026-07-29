@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 const WEEKDAYS = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
 const MONTHS = [
@@ -55,6 +55,15 @@ export default function DatePickerModal({ value, onSelect, onClose }) {
     onSelect(null);
     onClose();
   };
+
+  // Cerrar con tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const days = [];
   for (let i = 0; i < daysInMonth.firstDay; i++) {

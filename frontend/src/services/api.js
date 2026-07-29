@@ -86,28 +86,11 @@ export const authApi = {
 // ─── Tasks ─────────────────────────────────────
 export const tasksApi = {
   getAll: () => request('/tasks'),
-  create: (title, description, assigneeId) =>
-    request('/tasks', {
-      method: 'POST',
-      body: JSON.stringify({ title, description, assigneeId })
-    }),
   updateStatus: (id, status) =>
     request(`/tasks/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status })
-    }),
-  update: (id, data) =>
-    request(`/tasks/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    }),
-  remove: (id) =>
-    request(`/tasks/${id}`, { method: 'DELETE' })
-};
-
-// ─── Users ─────────────────────────────────────
-export const usersApi = {
-  getAll: () => request('/users'),  // Se sirve desde el backend
+    })
 };
 
 // ─── Notifications ────────────────────────────
@@ -125,4 +108,3 @@ export const profileApi = {
       body: JSON.stringify(data)
     }),
 };
-

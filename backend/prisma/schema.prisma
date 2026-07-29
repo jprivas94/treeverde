@@ -31,7 +31,7 @@ model Task {
   dueDate     DateTime?
   completedAt DateTime?
   archivedAt  DateTime?
-  imageUrl    String?
+  images      Json        @default("[]")
   tags        String      @default("")
   subtasks    Json        @default("[]")
   assigneeId  String?

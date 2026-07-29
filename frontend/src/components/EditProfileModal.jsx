@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import useKanbanStore from "../store/kanbanStore";
 import { profileApi } from "../services/api";
 
@@ -145,6 +145,15 @@ export default function EditProfileModal({ onClose }) {
       setSaving(false);
     }
   };
+
+  // Cerrar con tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleRemoveImage = () => {
     setFile(null);

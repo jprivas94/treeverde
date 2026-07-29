@@ -28,7 +28,7 @@ const columnColors = {
   }
 };
 
-export default function Column({ column, onEditTask, onMoveTask, onViewImage, fixedHeight, todoRef }) {
+export default function Column({ column, onEditTask, onMoveTask, onViewImage, fixedHeight, todoRef, isSharedUserForTask }) {
   const colors = columnColors[column.id] || columnColors.TODO;
 
   return (
@@ -69,7 +69,7 @@ export default function Column({ column, onEditTask, onMoveTask, onViewImage, fi
               </div>
             )}
             {column.tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} onViewImage={onViewImage} />
+              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} onViewImage={onViewImage} isSharedUser={isSharedUserForTask?.(task)} />
             ))}
             {provided.placeholder}
           </div>

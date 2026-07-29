@@ -36,6 +36,7 @@ export default function Board() {
   const todoColumnRef = useRef(null);
   const [activeColumn, setActiveColumn] = useState(0);
   const [referenceHeight, setReferenceHeight] = useState(null);
+  const [tasksLoading, setTasksLoading] = useState(true);
 
   const columns = getColumns();
 
@@ -58,16 +59,17 @@ export default function Board() {
 
   // Lista de imágenes de todas las tareas visibles para navegación
   const imagesList = useMemo(() =>
-    tasks.filter((t) => t.imageUrl).map((t) => ({
-      imageUrl: t.imageUrl,
-      title: t.title,
-      taskId: t.id
-    })),
+    tasks.flatMap((t) => {
+      const imgs = Array.isArray(t.images) ? t.images.filter(Boolean) : [];
+      return imgs.map((url) => ({ imageUrl: url, title: t.title }));
+    }),
     [tasks]
   );
 
   const handleViewImage = useCallback((task) => {
-    const idx = imagesList.findIndex((img) => img.taskId === task.id);
+    const imgs = Array.isArray(task.images) ? task.images.filter(Boolean) : [];
+    if (imgs.length === 0) return;
+    const idx = imagesList.findIndex((img) => img.imageUrl === imgs[0]);
     if (idx !== -1) setViewingImageIndex(idx);
   }, [imagesList]);
 
@@ -107,9 +109,16 @@ export default function Board() {
 
   // Cargar tareas al montar
   useEffect(() => {
+    setTasksLoading(true);
     tasksApi.getAll()
-      .then(setTasks)
-      .catch(console.error);
+      .then((data) => {
+        setTasks(data);
+        setTasksLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setTasksLoading(false);
+      });
   }, [setTasks]);
 
   // ─── Helpers de permisos ──────────────────────
@@ -267,6 +276,42 @@ export default function Board() {
           <span className="hidden sm:inline-block text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {showHistory ? 'Historial' : 'Tablero'}
           </span>
+
+          {/* Navegación de columnas (solo mobile) */}
+          {!showHistory && (
+            <div className="flex items-center gap-1 sm:hidden">
+              {columns.map((col, i) => {
+                const isActive = i === activeColumn;
+                const navStyle = {
+                  TODO: { dot: 'bg-amber-500', bg: 'bg-amber-100', text: 'text-amber-800', label: 'Por Hacer' },
+                  IN_PROGRESS: { dot: 'bg-blue-500', bg: 'bg-blue-100', text: 'text-blue-800', label: 'En Progreso' },
+                  DONE: { dot: 'bg-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Revisión' },
+                  ARCHIVED: { dot: 'bg-red-500', bg: 'bg-red-100', text: 'text-red-800', label: 'Terminado' },
+                }[col.id] || {};
+                return (
+                  <button
+                    key={col.id}
+                    onClick={() => scrollToColumn(i)}
+                    className={`flex items-center gap-1 rounded-lg transition-all duration-200 ${
+                      isActive
+                        ? `${navStyle.bg} ${navStyle.text} px-2 py-1 text-[10px] font-bold`
+                        : 'px-1.5 py-1'
+                    }`}
+                    aria-label={`Ir a ${navStyle.label}`}
+                  >
+                    {isActive ? (
+                      <>
+                        <span className={`w-2 h-2 rounded-full ${navStyle.dot}`} />
+                        <span>{navStyle.label}</span>
+                      </>
+                    ) : (
+                      <span className={`w-3 h-3 rounded-sm ${navStyle.dot}`} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
           {user && <NotificationPanel />}
@@ -357,7 +402,27 @@ export default function Board() {
       </header>
 
       {/* Contenido: Kanban o Historial */}
-      {showHistory ? (
+      {tasksLoading ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <div className="flex flex-col items-center gap-5">
+            {/* Spinner principal */}
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
+              <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin" />
+              <div className="absolute inset-2 rounded-full border-4 border-emerald-300 border-b-transparent animate-spin [animation-direction:reverse]" />
+            </div>
+            {/* Texto */}
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-700">Cargando tareas</p>
+              <p className="text-xs text-gray-400 mt-1">Obteniendo tus tareas del servidor...</p>
+            </div>
+            {/* Barra de progreso indeterminada */}
+            <div className="w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 rounded-full animate-loading-bar" style={{ width: '40%' }} />
+            </div>
+          </div>
+        </div>
+      ) : showHistory ? (
         <CompletedTasksPanel tasks={tasks} archivedTasks={archivedTasks} onEditTask={handleViewTask} currentUser={user} />
       ) : tasks.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
@@ -392,6 +457,7 @@ export default function Board() {
                   onViewImage={handleViewImage}
                   fixedHeight={column.id !== 'TODO' ? referenceHeight : undefined}
                   todoRef={column.id === 'TODO' ? todoColumnRef : undefined}
+                  isSharedUserForTask={isSharedUserForTask}
                 />
               ))}
             </div>

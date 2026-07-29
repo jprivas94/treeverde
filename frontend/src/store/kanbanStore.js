@@ -127,7 +127,9 @@ const useKanbanStore = create((set, get) => ({
           : status === 'DONE'
           ? 'Revisión'
           : '🗑 Terminado',
-      tasks: tasks.filter((t) => t.status === status)
+      tasks: tasks
+        .filter((t) => t.status === status)
+        .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
     }));
   },
 

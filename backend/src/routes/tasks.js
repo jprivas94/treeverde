@@ -41,7 +41,7 @@ router.get('/', async (req, res) => {
 // POST /api/tasks — crear una tarea
 router.post('/', async (req, res) => {
   try {
-    const { title, description, assigneeId, priority, dueDate, tags, imageUrl, subtasks } = req.body;
+    const { title, description, assigneeId, priority, dueDate, tags, images, subtasks } = req.body;
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'El título es requerido' });
     }
@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
         priority: priority || 'MEDIUM',
         dueDate: dueDate ? new Date(dueDate) : null,
         tags: tags || '',
-        imageUrl: imageUrl || null,
+        images: images || [],
         subtasks: subtasks || [],
         assigneeId: assigneeId || null,
         creatorId: req.userId
@@ -194,7 +194,7 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para modificar esta tarea' });
     }
 
-    const { title, description, assigneeId, status, priority, dueDate, tags, imageUrl, subtasks } = req.body;
+    const { title, description, assigneeId, status, priority, dueDate, tags, images, subtasks } = req.body;
 
     // Validar que el usuario asignado existe
     if (assigneeId) {
@@ -212,7 +212,7 @@ router.put('/:id', async (req, res) => {
     if (priority !== undefined) data.priority = priority;
     if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
     if (tags !== undefined) data.tags = tags;
-    if (imageUrl !== undefined) data.imageUrl = imageUrl || null;
+    if (images !== undefined) data.images = images;
     if (subtasks !== undefined) data.subtasks = subtasks;
 
     const task = await prisma.task.update({

@@ -97,9 +97,13 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
       .filter((t) => {
         if (seen.has(t.id)) return false;
         seen.add(t.id);
-        return !!t.imageUrl;
+        const imgs = Array.isArray(t.images) ? t.images.filter(Boolean) : [];
+        return imgs.length > 0;
       })
-      .map((t) => ({ imageUrl: t.imageUrl, title: t.title }));
+      .flatMap((t) => {
+        const imgs = Array.isArray(t.images) ? t.images.filter(Boolean) : [];
+        return imgs.map((url) => ({ imageUrl: url, title: t.title }));
+      });
   }, [tasks, archivedTasks]);
 
   const { completedData, filteredCount } = useMemo(() => {
@@ -113,10 +117,10 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
       )
     ];
 
-    // Ordenar por fecha de completado
+    // Ordenar por última modificación (updatedAt)
     const sorted = [...allCompleted].sort((a, b) => {
-      const dateA = new Date(a.completedAt || a.updatedAt || 0);
-      const dateB = new Date(b.completedAt || b.updatedAt || 0);
+      const dateA = new Date(a.updatedAt || a.createdAt || 0);
+      const dateB = new Date(b.updatedAt || b.createdAt || 0);
       return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
 
@@ -281,17 +285,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50">                    <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tarea</th>
-                  <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Creador</th>
-                  <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Asignado</th>
-                  <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Prioridad</th>
-                  <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Fecha limite</th>
-                  <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Completado</th>
-                  <th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                  <th className="text-right px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Diferencia</th>
-                </tr>
-              </thead>
+              <thead><tr className="border-b border-gray-100 bg-gray-50/50"><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tarea</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Creador</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Asignado</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Prioridad</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Fecha limite</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Completado</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Estado</th><th className="text-right px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Diferencia</th></tr></thead>
               <tbody className="divide-y divide-gray-50">
                 {pageItems.map((task) => {
                   const info = getTaskStatus(task);
@@ -300,14 +294,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
                   const completed = formatDate(task.completedAt || task.archivedAt || task.updatedAt);
 
                   return (
-                    <tr
-                      key={task.id}
-                      onClick={() => onEditTask?.(task)}
-                      className={`transition cursor-pointer ${
-                        info ? info.rowColor : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <td className="px-3 sm:px-5 py-2.5 sm:py-3">
+                    <tr key={task.id} onClick={() => onEditTask?.(task)} className={`transition cursor-pointer ${info ? info.rowColor : 'hover:bg-gray-50'}`}><td className="px-3 sm:px-5 py-2.5 sm:py-3">
                         <div className="flex items-center gap-1.5 sm:gap-2">
                           <div className={`w-1 h-1.5 sm:w-1.5 sm:h-1.5 rounded-full flex-shrink-0 ${
                             task.priority === 'CRITICAL' ? 'bg-red-400' :
@@ -317,21 +304,25 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs sm:text-sm font-medium text-gray-900">{task.title}</span>
-                              {task.imageUrl && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const idx = historyImagesList.findIndex(
-                                      (img) => img.imageUrl === task.imageUrl
-                                    );
-                                    if (idx !== -1) setViewingImageIndex(idx);
-                                  }}
-                                  className="shrink-0 text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded transition"
-                                  title="Ver imagen"
-                                >
-                                  👁️ Ver imagen
-                                </button>
-                              )}
+                              {(() => {
+                                const imgs = Array.isArray(task.images) ? task.images.filter(Boolean) : [];
+                                if (imgs.length === 0) return null;
+                                return (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const idx = historyImagesList.findIndex(
+                                        (img) => img.imageUrl === imgs[0]
+                                      );
+                                      if (idx !== -1) setViewingImageIndex(idx);
+                                    }}
+                                    className="shrink-0 text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded transition"
+                                    title="Ver imagen"
+                                  >
+                                    👁️ {imgs.length > 1 ? `${imgs.length} imágenes` : 'Ver imagen'}
+                                  </button>
+                                );
+                              })()}
                             </div>
                             {task.description && (
                               <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 line-clamp-1">{task.description}</p>
@@ -383,19 +374,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
                           <span className="text-[10px] sm:text-[11px] text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-3 sm:px-5 py-2.5 sm:py-3 text-right hidden sm:table-cell">
-                        {info ? (
-                          <span className={`text-[11px] sm:text-xs font-semibold ${
-                            info.diff < 0 ? 'text-emerald-600' :
-                            info.diff === 0 ? 'text-blue-600' : 'text-red-500'
-                          }`}>
-                            {info.label}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] sm:text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                    </tr>
+                      <td className="px-3 sm:px-5 py-2.5 sm:py-3 text-right hidden sm:table-cell">{info ? (<span className={`text-[11px] sm:text-xs font-semibold ${info.diff < 0 ? 'text-emerald-600' : info.diff === 0 ? 'text-blue-600' : 'text-red-500'}`}>{info.label}</span>) : (<span className="text-[11px] sm:text-xs text-gray-400">—</span>)}</td></tr>
                   );
                 })}
               </tbody>

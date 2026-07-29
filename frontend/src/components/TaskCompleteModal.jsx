@@ -10,6 +10,15 @@ export default function TaskCompleteModal({ task, onCancel }) {
     return () => clearTimeout(timer);
   }, [onCancel]);
 
+  // Cerrar con tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
   let completedEarly = false;
   let completedLate = false;
   let diffDays = 0;

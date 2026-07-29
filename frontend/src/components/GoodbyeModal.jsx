@@ -11,8 +11,12 @@ export default function GoodbyeModal() {
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-2xl p-10 mx-4 max-w-sm w-full text-center animate-scale-in">
         {/* Avatar */}
-        <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-3xl font-bold shadow-lg mb-4">
-          {user?.name?.charAt(0).toUpperCase() || '👤'}
+        <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-3xl font-bold shadow-lg mb-4 overflow-hidden">
+          {user?.profileImage ? (
+            <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
+          ) : (
+            user?.name?.charAt(0).toUpperCase() || '👤'
+          )}
         </div>
 
         {/* Texto */}

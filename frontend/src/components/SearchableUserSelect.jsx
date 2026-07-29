@@ -11,6 +11,7 @@ export default function SearchableUserSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -18,19 +19,23 @@ export default function SearchableUserSelect({
 
   const filteredUsers = useMemo(() => {
     let list = filter ? users.filter(filter) : users;
-    if (!search.trim()) return [];
+    if (!search.trim()) {
+      // Show all available users when focused (no search text yet)
+      return isFocused ? list : [];
+    }
     const q = search.toLowerCase().trim();
     return list.filter((u) => u.name.toLowerCase().startsWith(q));
-  }, [users, search, filter]);
+  }, [users, search, filter, isFocused]);
 
-  // Abrir dropdown solo cuando hay coincidencias
+  // Control open state based on focus
   useEffect(() => {
-    if (search.trim() && filteredUsers.length > 0) {
+    if (isFocused) {
       setOpen(true);
     } else {
       setOpen(false);
+      setSearch('');
     }
-  }, [search, filteredUsers]);
+  }, [isFocused]);
 
   useEffect(() => {
     if (!open) return;
@@ -41,23 +46,28 @@ export default function SearchableUserSelect({
         inputRef.current &&
         !inputRef.current.contains(e.target)
       ) {
-        setOpen(false);
-        setSearch('');
+        setIsFocused(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
+  const handleFocus = () => {
+    if (disabled) return;
+    setIsFocused(true);
+    setSearch('');
+  };
+
   const handleSelect = (userId) => {
     onChange(userId);
-    setOpen(false);
-    setSearch('');
+    setIsFocused(false);
   };
 
   const handleClear = () => {
     onChange('');
     setSearch('');
+    setIsFocused(true);
     inputRef.current?.focus();
   };
 
@@ -75,14 +85,15 @@ export default function SearchableUserSelect({
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-autocomplete="list"
-          value={open ? search : (selectedUser?.name || '')}
+          value={isFocused ? search : (selectedUser?.name || '')}
           onChange={(e) => {
             setSearch(e.target.value);
           }}
+          onFocus={handleFocus}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
-              setOpen(false);
-              setSearch('');
+              setIsFocused(false);
+              inputRef.current?.blur();
             }
             if (e.key === 'Enter' && filteredUsers.length === 1) {
               handleSelect(filteredUsers[0].id);
