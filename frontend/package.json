@@ -8,15 +8,22 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "node --test src/constants/kanbanConfig.test.js src/store/kanbanStore.test.js src/utils/images.test.js src/services/api.test.js src/services/realtime.test.js src/services/sessionSync.test.js src/services/sessionSync.e2e.test.js",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.0",
+    "@supabase/supabase-js": "^2.111.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@vitejs/plugin-react": "^6.0.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.39.5",

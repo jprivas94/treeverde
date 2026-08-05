@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import ImageViewModal from './ImageViewModal';
+import { getCloudinaryThumb } from '../utils/images';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -227,9 +228,10 @@ export default function ImageUploadModal({ currentImages = [], onSave, onClose }
                     className="relative group shrink-0 cursor-pointer mt-1"
                   >
                     <img
-                      src={url}
+                      src={getCloudinaryThumb(url, 160)}
                       alt={`Imagen ${idx + 1}`}
                       className="w-16 h-16 rounded-lg object-cover border border-gray-200"
+                      loading="lazy"
                     />
                     {/* Overlay Ver más */}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-lg transition flex items-center justify-center pointer-events-none">

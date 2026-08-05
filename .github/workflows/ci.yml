@@ -1,0 +1,123 @@
+# ─── CI de Treeverde ──────────────────────────────────────────────────
+# Corres en cada push a main y en cada PR:
+#   - backend  → lint + 106 tests unitarios (herméticos, sin BD)
+#   - frontend → lint + 66 tests unitarios (node:test)
+#   - e2e      → 3 tests de Playwright contra servidores reales + Postgres
+#                efímera (servicio de GitHub Actions) con migraciones + seed.
+# El backend NO usa dotenv: las env vars llegan por el entorno del proceso,
+# y el webServer de Playwright las hereda del job (por eso van a nivel de job).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Backend: lint + tests unitarios ─────────────────────────────────
+  backend:
+    name: Backend · lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Instalar dependencias
+        working-directory: backend
+        run: npm ci
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+      - name: Tests unitarios
+        working-directory: backend
+        run: npm test
+
+  # ─── Frontend: lint + tests unitarios ────────────────────────────────
+  frontend:
+    name: Frontend · lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm ci
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Tests unitarios
+        working-directory: frontend
+        run: npm test
+
+  # ─── E2E: Playwright contra servidores reales + Postgres efímera ─────
+  e2e:
+    name: E2E · Playwright
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: treeverde
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Env vars que heredará el backend iniciado por el webServer de Playwright
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/treeverde?schema=public
+      JWT_SECRET: ci-only-secret-no-usado-en-prod-1234567890
+      FRONTEND_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar backend
+        working-directory: backend
+        run: npm ci
+      - name: Instalar frontend
+        working-directory: frontend
+        run: npm ci
+      - name: Generar cliente + migraciones + seed (Postgres de CI)
+        working-directory: backend
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run db:seed
+      - name: Instalar navegador de Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Tests e2e
+        working-directory: frontend
+        run: npx playwright test
+      - name: Subir reporte de Playwright (solo si falla)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

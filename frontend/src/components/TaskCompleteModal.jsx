@@ -1,23 +1,23 @@
 import { useEffect } from 'react';
 
-export default function TaskCompleteModal({ task, onCancel }) {
+export default function TaskCompleteModal({ task, onConfirm }) {
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
   const completedAt = task.completedAt ? new Date(task.completedAt) : null;
 
   // Cerrar automaticamente despues de 5 segundos
   useEffect(() => {
-    const timer = setTimeout(onCancel, 5000);
+    const timer = setTimeout(onConfirm, 5000);
     return () => clearTimeout(timer);
-  }, [onCancel]);
+  }, [onConfirm]);
 
   // Cerrar con tecla ESC
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape') onConfirm();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel]);
+  }, [onConfirm]);
 
   let completedEarly = false;
   let completedLate = false;
@@ -64,7 +64,7 @@ export default function TaskCompleteModal({ task, onCancel }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center animate-fade-in">
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onConfirm} />
 
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-2xl mx-4 max-w-md w-full overflow-hidden animate-scale-in">
@@ -126,7 +126,7 @@ export default function TaskCompleteModal({ task, onCancel }) {
         {/* Footer */}
         <div className="px-6 pb-6">
           <button
-            onClick={onCancel}
+            onClick={onConfirm}
             className={`w-full py-2.5 text-white font-semibold rounded-xl transition ${
               completedEarly
                 ? 'bg-emerald-600 hover:bg-emerald-700'

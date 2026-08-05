@@ -1,35 +1,9 @@
 import { Droppable } from '@hello-pangea/dnd';
 import TaskCard from './TaskCard';
-
-const columnColors = {
-  TODO: {
-    bg: 'bg-amber-50',
-    header: 'bg-amber-100',
-    dot: 'bg-amber-500',
-    text: 'text-amber-800'
-  },
-  IN_PROGRESS: {
-    bg: 'bg-blue-50',
-    header: 'bg-blue-100',
-    dot: 'bg-blue-500',
-    text: 'text-blue-800'
-  },
-  DONE: {
-    bg: 'bg-emerald-50',
-    header: 'bg-emerald-100',
-    dot: 'bg-emerald-500',
-    text: 'text-emerald-800'
-  },
-  ARCHIVED: {
-    bg: 'bg-red-50',
-    header: 'bg-red-100',
-    dot: 'bg-red-500',
-    text: 'text-red-800'
-  }
-};
+import { getStatusConfig } from '../constants/kanbanConfig';
 
 export default function Column({ column, onEditTask, onMoveTask, onViewImage, fixedHeight, todoRef, isSharedUserForTask }) {
-  const colors = columnColors[column.id] || columnColors.TODO;
+  const colors = getStatusConfig(column.id);
 
   return (
     <div

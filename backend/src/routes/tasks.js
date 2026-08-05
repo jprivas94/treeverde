@@ -1,17 +1,27 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
+import prisma from '../db.js';
 import authenticate from '../middleware/auth.js';
 import logger from '../utils/logger.js';
+import { getFrontendUrl } from '../utils/config.js';
+import { canViewTask, canEditTask, canEditSubtasks, canDeleteTask } from '../utils/permissions.js';
+import { notifyAssigned, notifyCompleted, notifyShared, notifySubtaskCompleted } from '../utils/notifications.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+
+// Campos mínimos de usuario incluidos en las tareas (sin email: no se muestra en la UI)
+const USER_SELECT = { id: true, name: true, profileImage: true };
 
 // Todas las rutas de tasks requieren autenticación
 router.use(authenticate);
 
 // GET /api/tasks — obtener tareas donde el usuario es creador, asignado o invitado
+// Paginación opcional: ?limit=50&offset=0 (máx 500 por página; sin limit = todas)
 router.get('/', async (req, res) => {
   try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 0, 0), 500);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
     const tasks = await prisma.task.findMany({
       where: {
         OR: [
@@ -21,20 +31,48 @@ router.get('/', async (req, res) => {
         ]
       },
       include: {
-        assignee: { select: { id: true, name: true, email: true, profileImage: true } },
-        creator: { select: { id: true, name: true, email: true, profileImage: true } },
+        assignee: { select: USER_SELECT },
+        creator: { select: USER_SELECT },
         shares: {
           include: {
-            user: { select: { id: true, name: true, email: true, profileImage: true } }
+            user: { select: USER_SELECT }
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      ...(limit > 0 ? { take: limit, skip: offset } : {})
     });
     res.json(tasks);
   } catch (err) {
     logger.error('Error al obtener tareas', err, { userId: req.userId });
     res.status(500).json({ error: 'Error al obtener tareas' });
+  }
+});
+
+// GET /api/tasks/:id — obtener una tarea concreta (incluye shares)
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const task = await prisma.task.findUnique({
+      where: { id },
+      include: {
+        assignee: { select: USER_SELECT },
+        creator: { select: USER_SELECT },
+        shares: {
+          include: {
+            user: { select: USER_SELECT }
+          }
+        }
+      }
+    });
+    if (!task) return res.status(404).json({ error: 'Tarea no encontrada' });
+    if (!canViewTask(task, req.userId)) {
+      return res.status(403).json({ error: 'No tienes permiso para ver esta tarea' });
+    }
+    res.json(task);
+  } catch (err) {
+    logger.error('Error al obtener tarea', err, { userId: req.userId, taskId: req.params?.id });
+    res.status(500).json({ error: 'Error al obtener tarea' });
   }
 });
 
@@ -68,22 +106,19 @@ router.post('/', async (req, res) => {
         creatorId: req.userId
       },
       include: {
-        assignee: { select: { id: true, name: true, email: true, profileImage: true } },
-        creator: { select: { id: true, name: true, email: true, profileImage: true } }
+        assignee: { select: USER_SELECT },
+        creator: { select: USER_SELECT }
       }
     });
 
     // Notificar al asignado si la tarea fue asignada a alguien más
     if (assigneeId && assigneeId !== req.userId) {
-      const creatorName = task.creator?.name || 'Un usuario';
-      await prisma.notification.create({
-        data: {
-          userId: assigneeId,
-          taskId: task.id,
-          type: 'ASSIGNED',
-          message: `${creatorName} te asignó la tarea: ${task.title}`
-        }
-      }).catch((e) => logger.error('Error al crear notificación', e));
+      await notifyAssigned(prisma, {
+        userId: assigneeId,
+        taskId: task.id,
+        actorName: task.creator?.name || 'Un usuario',
+        taskTitle: task.title
+      });
     }
 
     res.status(201).json(task);
@@ -110,7 +145,7 @@ router.patch('/:id/status', async (req, res) => {
     if (!existingTask) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
-    if (existingTask.creatorId !== req.userId && existingTask.assigneeId !== req.userId) {
+    if (!canEditTask(existingTask, req.userId)) {
       return res.status(403).json({ error: 'No tienes permiso para modificar esta tarea' });
     }
 
@@ -131,11 +166,11 @@ router.patch('/:id/status', async (req, res) => {
       where: { id },
       data: updateData,
       include: {
-        assignee: { select: { id: true, name: true, email: true, profileImage: true } },
-        creator: { select: { id: true, name: true, email: true, profileImage: true } },
+        assignee: { select: USER_SELECT },
+        creator: { select: USER_SELECT },
         shares: {
           include: {
-            user: { select: { id: true, name: true, email: true, profileImage: true } }
+            user: { select: USER_SELECT }
           }
         }
       }
@@ -146,24 +181,10 @@ router.patch('/:id/status', async (req, res) => {
       const completionNotified = new Set();
       if (existingTask.creatorId && existingTask.creatorId !== req.userId) {
         completionNotified.add(existingTask.creatorId);
-        await prisma.notification.create({
-          data: {
-            userId: existingTask.creatorId,
-            taskId: id,
-            type: 'COMPLETED',
-            message: `La tarea "${task.title}" fue marcada como completada`
-          }
-        }).catch((e) => logger.error('Error al notificar completado a creador', e));
+        await notifyCompleted(prisma, { userId: existingTask.creatorId, taskId: id, taskTitle: task.title });
       }
       if (existingTask.assigneeId && existingTask.assigneeId !== req.userId && !completionNotified.has(existingTask.assigneeId)) {
-        await prisma.notification.create({
-          data: {
-            userId: existingTask.assigneeId,
-            taskId: id,
-            type: 'COMPLETED',
-            message: `La tarea "${task.title}" fue marcada como completada`
-          }
-        }).catch((e) => logger.error('Error al notificar completado a asignado', e));
+        await notifyCompleted(prisma, { userId: existingTask.assigneeId, taskId: id, taskTitle: task.title });
       }
     }
 
@@ -190,7 +211,7 @@ router.put('/:id', async (req, res) => {
     if (!existingTask) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
-    if (existingTask.creatorId !== req.userId && existingTask.assigneeId !== req.userId) {
+    if (!canEditTask(existingTask, req.userId)) {
       return res.status(403).json({ error: 'No tienes permiso para modificar esta tarea' });
     }
 
@@ -219,11 +240,11 @@ router.put('/:id', async (req, res) => {
       where: { id },
       data,
       include: {
-        assignee: { select: { id: true, name: true, email: true, profileImage: true } },
-        creator: { select: { id: true, name: true, email: true, profileImage: true } },
+        assignee: { select: USER_SELECT },
+        creator: { select: USER_SELECT },
         shares: {
           include: {
-            user: { select: { id: true, name: true, email: true, profileImage: true } }
+            user: { select: USER_SELECT }
           }
         }
       }
@@ -231,28 +252,18 @@ router.put('/:id', async (req, res) => {
 
     // Notificar si se reasignó la tarea a otro usuario
     if (assigneeId !== undefined && assigneeId !== existingTask.assigneeId && assigneeId !== req.userId) {
-      const creatorName = task.creator?.name || 'Un usuario';
-      await prisma.notification.create({
-        data: {
-          userId: assigneeId,
-          taskId: id,
-          type: 'ASSIGNED',
-          message: `${creatorName} te asignó la tarea: ${task.title}`
-        }
-      }).catch((e) => logger.error('Error al crear notificación de reasignación', e));
+      await notifyAssigned(prisma, {
+        userId: assigneeId,
+        taskId: id,
+        actorName: task.creator?.name || 'Un usuario',
+        taskTitle: task.title
+      });
     }
 
     // Notificar al creador solo si realmente cambió a completado
     const isNewlyCompleted = status !== undefined && (status === 'DONE' || status === 'ARCHIVED') && existingTask.status !== 'DONE' && existingTask.status !== 'ARCHIVED';
     if (isNewlyCompleted && existingTask.creatorId !== req.userId && existingTask.creatorId) {
-      await prisma.notification.create({
-        data: {
-          userId: existingTask.creatorId,
-          taskId: id,
-          type: 'COMPLETED',
-          message: `La tarea "${task.title}" fue marcada como completada`
-        }
-      }).catch((e) => logger.error('Error al crear notificación de completado', e));
+      await notifyCompleted(prisma, { userId: existingTask.creatorId, taskId: id, taskTitle: task.title });
     }
 
     res.json(task);
@@ -283,7 +294,7 @@ router.post('/:id/share', async (req, res) => {
     if (!task) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
-    if (task.creatorId !== req.userId && task.assigneeId !== req.userId) {
+    if (!canEditTask(task, req.userId)) {
       return res.status(403).json({ error: 'No tienes permiso para compartir esta tarea' });
     }
 
@@ -299,7 +310,7 @@ router.post('/:id/share', async (req, res) => {
       update: {},
       create: { taskId: id, userId },
       include: {
-        user: { select: { id: true, name: true, email: true, profileImage: true } }
+        user: { select: USER_SELECT }
       }
     });
 
@@ -313,22 +324,51 @@ router.post('/:id/share', async (req, res) => {
         where: { id },
         select: { title: true }
       });
-      const sharerName = sharer?.name || 'Un usuario';
-      const taskTitle = taskInfo?.title || 'una tarea';
-      await prisma.notification.create({
-        data: {
-          userId,
-          taskId: id,
-          type: 'SHARED',
-          message: `${sharerName} compartió la tarea "${taskTitle}" contigo`
-        }
-      }).catch((e) => logger.error('Error al crear notificación de compartido', e));
+      await notifyShared(prisma, {
+        userId,
+        taskId: id,
+        sharerName: sharer?.name || 'Un usuario',
+        taskTitle: taskInfo?.title || 'una tarea'
+      });
     }
 
     res.status(201).json(share);
   } catch (err) {
     logger.error('Error al compartir tarea', err, { userId: req.userId, taskId: req.params?.id, targetUserId: req.body?.userId });
     res.status(500).json({ error: 'Error al compartir tarea' });
+  }
+});
+
+// POST /api/tasks/:id/invite — generar (o regenerar) el enlace de invitación
+// - role 'assignee' (URL de creación): quien la acepte queda como asignado.
+// - role 'share' (URL de edición): quien la acepte queda como compartido.
+// Cada llamada regenera el token: el creador puede crear enlaces las veces que quiera.
+router.post('/:id/invite', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const role = req.body?.role === 'assignee' ? 'assignee' : 'share';
+
+    const task = await prisma.task.findUnique({
+      where: { id },
+      select: { creatorId: true, assigneeId: true }
+    });
+    if (!task) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    if (!canEditTask(task, req.userId)) {
+      return res.status(403).json({ error: 'No tienes permiso para generar el enlace de invitación' });
+    }
+
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    await prisma.task.update({
+      where: { id },
+      data: { inviteToken, inviteRole: role }
+    });
+
+    res.json({ inviteUrl: `${getFrontendUrl()}/?invite=${inviteToken}`, inviteRole: role });
+  } catch (err) {
+    logger.error('Error al generar enlace de invitación', err, { userId: req.userId, taskId: req.params?.id });
+    res.status(500).json({ error: 'Error al generar enlace de invitación' });
   }
 });
 
@@ -345,7 +385,7 @@ router.delete('/:id/share/:userId', async (req, res) => {
     if (!task) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
-    if (task.creatorId !== req.userId && task.assigneeId !== req.userId) {
+    if (!canEditTask(task, req.userId)) {
       return res.status(403).json({ error: 'No tienes permiso para modificar esta tarea' });
     }
 
@@ -373,19 +413,19 @@ router.patch('/:id/subtasks', async (req, res) => {
     // Verificar permisos (creador, asignado o compartido pueden modificar subtareas)
     const existingTask = await prisma.task.findUnique({
       where: { id },
-      select: { creatorId: true, assigneeId: true, title: true, subtasks: true }
+      select: {
+        creatorId: true,
+        assigneeId: true,
+        title: true,
+        subtasks: true,
+        shares: { select: { userId: true } }
+      }
     });
     if (!existingTask) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
-    if (existingTask.creatorId !== req.userId && existingTask.assigneeId !== req.userId) {
-      // Verificar si el usuario está en la lista de compartidos
-      const isShared = await prisma.taskShare.findFirst({
-        where: { taskId: id, userId: req.userId }
-      });
-      if (!isShared) {
-        return res.status(403).json({ error: 'No tienes permiso para modificar esta tarea' });
-      }
+    if (!canEditSubtasks(existingTask, req.userId)) {
+      return res.status(403).json({ error: 'No tienes permiso para modificar esta tarea' });
     }
 
     const task = await prisma.task.update({
@@ -425,14 +465,13 @@ router.patch('/:id/subtasks', async (req, res) => {
         // Enviar notificación a cada usuario (creador y/o asignado)
         for (const targetUserId of notifyUserIds) {
           if (targetUserId === toggledBy) continue; // No notificar a quien completó
-          await prisma.notification.create({
-            data: {
-              userId: targetUserId,
-              taskId: id,
-              type: 'SUBTASK_COMPLETED',
-              message: `${completerName} completó la sub-tarea "${newSt.title}" en "${existingTask.title}"`
-            }
-          }).catch((e) => logger.error('Error al notificar subtarea completada', e));
+          await notifySubtaskCompleted(prisma, {
+            userId: targetUserId,
+            taskId: id,
+            completerName,
+            subtaskTitle: newSt.title,
+            taskTitle: existingTask.title
+          });
         }
       }
     }
@@ -457,7 +496,7 @@ router.delete('/:id', async (req, res) => {
     if (!existingTask) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
-    if (existingTask.creatorId !== req.userId) {
+    if (!canDeleteTask(existingTask, req.userId)) {
       return res.status(403).json({ error: 'Solo el creador de la tarea puede eliminarla' });
     }
 

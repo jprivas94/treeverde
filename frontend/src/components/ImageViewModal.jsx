@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect } from "react";
 
 export default function ImageViewModal({ images, currentIndex, onClose, onNavigate }) {
   const current = images[currentIndex];

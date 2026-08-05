@@ -5,12 +5,18 @@ import taskRoutes from './routes/tasks.js';
 import userRoutes from './routes/users.js';
 import uploadRoutes from './routes/upload.js';
 import notificationRoutes from './routes/notifications.js';
+import inviteRoutes from './routes/invites.js';
 import logger from './utils/logger.js';
+import { getAllowedOrigins, getFrontendUrl } from './utils/config.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// Confiar en el proxy de Vercel para obtener la IP real del cliente (rate limiting)
+app.set('trust proxy', 1);
+
+// CORS restringido a los orígenes del frontend configurados (FRONTEND_URL)
+app.use(cors({ origin: getAllowedOrigins() }));
 app.use(express.json());
 
 // ─── Middleware de logging de peticiones HTTP ──
@@ -27,6 +33,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/invites', inviteRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -34,7 +41,7 @@ app.get('/api/health', (_req, res) => {
 
 // ─── Ruta raíz — redirige al frontend o muestra info ──
 app.get('/', (_req, res) => {
-  const frontendUrl = 'http://localhost:5173';
+  const frontendUrl = getFrontendUrl();
   res.send(`
     <!DOCTYPE html>
     <html lang="es">
@@ -71,6 +78,18 @@ app.get('/', (_req, res) => {
     </body>
     </html>
   `);
+});
+
+// ─── 404 para rutas API no encontradas ──
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Ruta no encontrada' });
+});
+
+// ─── Manejador central de errores ──
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  logger.error('Error no controlado', err, { path: req.originalUrl || req.url, userId: req.userId });
+  res.status(500).json({ error: 'Error interno del servidor' });
 });
 
 // Vercel export (no llama a listen porque Vercel maneja el listener)

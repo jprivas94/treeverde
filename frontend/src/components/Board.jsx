@@ -1,26 +1,46 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import { DragDropContext } from '@hello-pangea/dnd';
 import Column from './Column';
-import CreateTaskModal from './CreateTaskModal';
-import CompletedTasksPanel from './CompletedTasksPanel';
-import EditProfileModal from './EditProfileModal';
-import GoodbyeModal from './GoodbyeModal';
-import TaskCompleteModal from './TaskCompleteModal';
-import ImageViewModal from './ImageViewModal';
 import NotificationPanel from './NotificationPanel';
-import EditTaskModal, { getUserColor } from './EditTaskModal';
+import { getUserColor } from '../constants/kanbanConfig';
 import useKanbanStore from '../store/kanbanStore';
 import { tasksApi } from '../services/api';
+import { STATUS_NAV, TASKS_PAGE_SIZE } from '../constants/kanbanConfig';
+import { getCloudinaryThumb } from '../utils/images';
 import logger from '../services/logger';
+import TreeLogo from './TreeLogo';
+import TreeSpinner from './TreeSpinner';
+
+// ─── Code-splitting: modales y paneles secundarios se cargan bajo demanda ──
+const CreateTaskModal = lazy(() => import('./CreateTaskModal'));
+const CompletedTasksPanel = lazy(() => import('./CompletedTasksPanel'));
+const EditProfileModal = lazy(() => import('./EditProfileModal'));
+const GoodbyeModal = lazy(() => import('./GoodbyeModal'));
+const TaskCompleteModal = lazy(() => import('./TaskCompleteModal'));
+const ImageViewModal = lazy(() => import('./ImageViewModal'));
+const EditTaskModal = lazy(() => import('./EditTaskModal'));
+
+// Fallback mientras se descarga un chunk diferido
+function ModalLoading() {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
+      <TreeSpinner size="lg" light />
+    </div>
+  );
+}
 
 export default function Board() {
   const { user, logout } = useKanbanStore();
   const tasks = useKanbanStore((s) => s.tasks);
   const archivedTasks = useKanbanStore((s) => s.archivedTasks);
   const setTasks = useKanbanStore((s) => s.setTasks);
+  const tasksLoaded = useKanbanStore((s) => s.tasksLoaded);
+  const tasksHasMore = useKanbanStore((s) => s.tasksHasMore);
+  const appendTasks = useKanbanStore((s) => s.appendTasks);
   const updateTaskStatus = useKanbanStore((s) => s.updateTaskStatus);
   const removeTask = useKanbanStore((s) => s.removeTask);
   const archiveTask = useKanbanStore((s) => s.archiveTask);
+  const restoreTask = useKanbanStore((s) => s.restoreTask);
   const getColumns = useKanbanStore((s) => s.getColumns);
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -36,7 +56,8 @@ export default function Board() {
   const todoColumnRef = useRef(null);
   const [activeColumn, setActiveColumn] = useState(0);
   const [referenceHeight, setReferenceHeight] = useState(null);
-  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksLoading, setTasksLoading] = useState(!tasksLoaded);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const columns = getColumns();
 
@@ -107,19 +128,35 @@ export default function Board() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Cargar tareas al montar
+  // Cargar tareas al montar (solo si no fueron precargadas en paralelo)
   useEffect(() => {
+    if (tasksLoaded) return;
     setTasksLoading(true);
-    tasksApi.getAll()
+    tasksApi.getAll({ limit: TASKS_PAGE_SIZE })
       .then((data) => {
-        setTasks(data);
+        setTasks(data, data.length === TASKS_PAGE_SIZE);
         setTasksLoading(false);
       })
       .catch((err) => {
         console.error(err);
         setTasksLoading(false);
       });
-  }, [setTasks]);
+  }, [setTasks, tasksLoaded]);
+
+  // ─── Cargar más tareas (paginación) ────────────────
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore) return;
+    const offset = tasks.length + archivedTasks.length;
+    setLoadingMore(true);
+    try {
+      const data = await tasksApi.getAll({ limit: TASKS_PAGE_SIZE, offset });
+      appendTasks(data, data.length === TASKS_PAGE_SIZE);
+    } catch (err) {
+      logger.error('Error al cargar más tareas', err, { offset });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, tasks.length, archivedTasks.length, appendTasks]);
 
   // ─── Helpers de permisos ──────────────────────
   const isSharedUserForTask = useCallback((task) => {
@@ -170,7 +207,7 @@ export default function Board() {
       // Rollback: revertir al estado anterior
       updateTaskStatus(draggableId, source.droppableId);
     }
-  }, [updateTaskStatus, tasks, setCompletingTask, isSharedUserForTask]);
+  }, [updateTaskStatus, tasks, setCompletingTask, isSharedUserForTask, isAssigneeOnly]);
 
   // ─── Movimiento con botones (mobile y desktop) ──────
   const handleMoveTask = useCallback(async (task, newStatus) => {
@@ -198,7 +235,7 @@ export default function Board() {
       logger.error('Error al mover tarea con botones', err, { taskId, fromStatus: oldStatus, toStatus: newStatus });
       updateTaskStatus(taskId, oldStatus);
     }
-  }, [updateTaskStatus, setCompletingTask, isSharedUserForTask]);
+  }, [updateTaskStatus, setCompletingTask, isSharedUserForTask, isAssigneeOnly]);
 
   // ─── Handlers ─────────────────────────────────
   const handleEditTask = (task) => {
@@ -220,9 +257,10 @@ export default function Board() {
     setViewingTask({ ...task, _sharedView: false });
   };
 
-  const handleCancelComplete = (task, sourceId) => {
+  const handleArchiveTask = (task, sourceId) => {
     // ── Archivar: cambiar status a ARCHIVED y remover del tablero ──
     const taskId = task.id;
+    const now = new Date().toISOString();
 
     // 1. Cambiar status a ARCHIVED en el store
     updateTaskStatus(taskId, 'ARCHIVED');
@@ -230,8 +268,14 @@ export default function Board() {
     // 2. Remover inmediatamente del tablero (no se acumula en la columna Terminado)
     removeTask(taskId);
 
-    // 3. Guardar en archivedTasks para el historial inmediato
-    archiveTask(task);
+    // 3. Guardar en archivedTasks para el historial inmediato (estado ya actualizado)
+    archiveTask({
+      ...task,
+      status: 'ARCHIVED',
+      completedAt: task.completedAt || now,
+      archivedAt: now,
+      updatedAt: now
+    });
 
     // 4. Cerrar modal
     setCompletingTask(null);
@@ -243,12 +287,8 @@ export default function Board() {
         taskTitle: task.title,
         sourceStatus: sourceId,
       });
-      // Rollback: restaurar al estado anterior
-      // Nota: updateTaskStatus no funciona porque removeTask ya eliminó la tarea de tasks[]
-      useKanbanStore.setState((s) => ({
-        tasks: [...s.tasks, { ...task, status: sourceId }],
-        archivedTasks: s.archivedTasks.filter((t) => t.id !== taskId),
-      }));
+      // Rollback: restaurar al estado anterior usando la acción del store
+      restoreTask(task, sourceId);
     });
   };
 
@@ -271,7 +311,7 @@ export default function Board() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="text-xl sm:text-2xl">📋</span>
+          <TreeLogo className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
           <h1 className="hidden sm:block text-lg font-bold text-gray-900">Treeverde</h1>
           <span className="hidden sm:inline-block text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {showHistory ? 'Historial' : 'Tablero'}
@@ -282,12 +322,7 @@ export default function Board() {
             <div className="flex items-center gap-1 sm:hidden">
               {columns.map((col, i) => {
                 const isActive = i === activeColumn;
-                const navStyle = {
-                  TODO: { dot: 'bg-amber-500', bg: 'bg-amber-100', text: 'text-amber-800', label: 'Por Hacer' },
-                  IN_PROGRESS: { dot: 'bg-blue-500', bg: 'bg-blue-100', text: 'text-blue-800', label: 'En Progreso' },
-                  DONE: { dot: 'bg-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Revisión' },
-                  ARCHIVED: { dot: 'bg-red-500', bg: 'bg-red-100', text: 'text-red-800', label: 'Terminado' },
-                }[col.id] || {};
+                const navStyle = STATUS_NAV[col.id] || {};
                 return (
                   <button
                     key={col.id}
@@ -318,13 +353,14 @@ export default function Board() {
           {user && (
             <div className="relative" ref={menuRef}>
               <button
+                data-testid="user-menu-button"
                 onClick={() => setShowUserMenu((v) => !v)}
                 className="flex items-center gap-1 sm:gap-3 pr-2 sm:pr-3 border-r border-gray-200 cursor-pointer hover:opacity-80 transition"
               >
                 <div className="relative">
                   <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-bold overflow-hidden bg-emerald-500">
                     {user.profileImage ? (
-                      <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
+                      <img src={getCloudinaryThumb(user.profileImage, 96)} alt="" className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       user.name.charAt(0).toUpperCase()
                     )}
@@ -332,7 +368,7 @@ export default function Board() {
                   <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-400 border-2 border-white rounded-full" />
                 </div>
                 <div className="hidden sm:flex flex-col items-start">
-                  <span className="text-sm font-semibold text-gray-900 leading-tight">{user.name}</span>
+                  <span data-testid="user-menu-name" className="text-sm font-semibold text-gray-900 leading-tight">{user.name}</span>
                   <span className="text-[11px] text-gray-400 leading-tight">{user.email}</span>
                 </div>
               </button>
@@ -343,7 +379,7 @@ export default function Board() {
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden shrink-0">
                       {user.profileImage ? (
-                        <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
+                        <img src={getCloudinaryThumb(user.profileImage, 96)} alt="" className="w-full h-full object-cover" loading="lazy" />
                       ) : (
                         user.name.charAt(0).toUpperCase()
                       )}
@@ -355,14 +391,14 @@ export default function Board() {
                   </div>
                   <div className="py-1">
                     <button
-                      onClick={() => { setShowUserMenu(false); setShowEditProfile(true); }}
+                      data-testid="edit-profile-button" onClick={() => { setShowUserMenu(false); setShowEditProfile(true); }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition font-medium"
                     >
                       <span className="text-base">⚙️</span>
                       Editar perfil
                     </button>
                     <button
-                      onClick={() => { setShowUserMenu(false); handleLogout(); }}
+                      data-testid="logout-button" onClick={() => { setShowUserMenu(false); handleLogout(); }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition font-medium"
                     >
                       <span className="text-base">🚪</span>
@@ -405,12 +441,8 @@ export default function Board() {
       {tasksLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <div className="flex flex-col items-center gap-5">
-            {/* Spinner principal */}
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
-              <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin" />
-              <div className="absolute inset-2 rounded-full border-4 border-emerald-300 border-b-transparent animate-spin [animation-direction:reverse]" />
-            </div>
+            {/* Spinner principal con logo de árbol */}
+            <TreeSpinner size="xl" />
             {/* Texto */}
             <div className="text-center">
               <p className="text-sm font-semibold text-gray-700">Cargando tareas</p>
@@ -423,10 +455,16 @@ export default function Board() {
           </div>
         </div>
       ) : showHistory ? (
-        <CompletedTasksPanel tasks={tasks} archivedTasks={archivedTasks} onEditTask={handleViewTask} currentUser={user} />
-      ) : tasks.length === 0 ? (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8">
+          <TreeSpinner size="lg" />
+        </div>}>
+          <CompletedTasksPanel tasks={tasks} archivedTasks={archivedTasks} onEditTask={handleViewTask} />
+        </Suspense>
+      ) : tasks.length === 0 && archivedTasks.length === 0 && !tasksHasMore ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="text-6xl sm:text-7xl mb-4">📋</div>
+          <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4">
+            <TreeLogo className="w-11 h-11 sm:w-14 sm:h-14 text-emerald-500" />
+          </div>
           <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">No hay tareas visibles</h2>
           <p className="text-sm text-gray-500 max-w-md mb-6">
             Aún no tienes tareas creadas, asignadas o compartidas contigo.
@@ -478,36 +516,81 @@ export default function Board() {
             </div>
           </div>
           </DragDropContext>
+
+          {/* Cargar más tareas (paginación) */}
+          {tasksHasMore && (
+            <div className="flex justify-center pb-3">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-5 py-2.5 bg-white border border-gray-200 text-sm font-semibold text-emerald-700 rounded-xl shadow-sm hover:bg-emerald-50 hover:border-emerald-200 transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loadingMore ? (
+                  <>
+                    <TreeSpinner size="xs" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>
+                    <span>⬇️</span>
+                    Cargar más tareas
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </>
       )}
 
-      {showModal && <CreateTaskModal onClose={() => setShowModal(false)} />}
-
-      {editingTask && <EditTaskModal task={editingTask} onClose={() => setEditingTask(null)} onViewImage={handleViewImage} />}
-      {viewingTask && (
-        viewingTask._sharedView ? (
-          <EditTaskModal task={viewingTask} onClose={() => setViewingTask(null)} sharedView userColor={viewingTask._userColor} onViewImage={handleViewImage} />
-        ) : (
-          <EditTaskModal task={viewingTask} onClose={() => setViewingTask(null)} readOnly onViewImage={handleViewImage} />
-        )
+      {showModal && (
+        <Suspense fallback={<ModalLoading />}>
+          <CreateTaskModal onClose={() => setShowModal(false)} />
+        </Suspense>
       )}
 
-      {showEditProfile && <EditProfileModal onClose={() => setShowEditProfile(false)} />}
-      {showGoodbye && <GoodbyeModal />}
+      {editingTask && (
+        <Suspense fallback={<ModalLoading />}>
+          <EditTaskModal task={editingTask} onClose={() => setEditingTask(null)} />
+        </Suspense>
+      )}
+      {viewingTask && (
+        <Suspense fallback={<ModalLoading />}>
+          {viewingTask._sharedView ? (
+            <EditTaskModal task={viewingTask} onClose={() => setViewingTask(null)} sharedView userColor={viewingTask._userColor} />
+          ) : (
+            <EditTaskModal task={viewingTask} onClose={() => setViewingTask(null)} readOnly />
+          )}
+        </Suspense>
+      )}
+
+      {showEditProfile && (
+        <Suspense fallback={<ModalLoading />}>
+          <EditProfileModal onClose={() => setShowEditProfile(false)} />
+        </Suspense>
+      )}
+      {showGoodbye && (
+        <Suspense fallback={<ModalLoading />}>
+          <GoodbyeModal />
+        </Suspense>
+      )}
       {completingTask && (
-        <TaskCompleteModal
-          task={completingTask.task}
-          onCancel={() => handleCancelComplete(completingTask.task, completingTask.sourceId)}
-        />
+        <Suspense fallback={<ModalLoading />}>
+          <TaskCompleteModal
+            task={completingTask.task}
+            onConfirm={() => handleArchiveTask(completingTask.task, completingTask.sourceId)}
+          />
+        </Suspense>
       )}
 
       {viewingImageIndex !== null && (
-        <ImageViewModal
-          images={imagesList.map(({ imageUrl, title }) => ({ imageUrl, title }))}
-          currentIndex={viewingImageIndex}
-          onClose={() => setViewingImageIndex(null)}
-          onNavigate={handleNavigateImage}
-        />
+        <Suspense fallback={<ModalLoading />}>
+          <ImageViewModal
+            images={imagesList.map(({ imageUrl, title }) => ({ imageUrl, title }))}
+            currentIndex={viewingImageIndex}
+            onClose={() => setViewingImageIndex(null)}
+            onNavigate={handleNavigateImage}
+          />
+        </Suspense>
       )}
     </div>
   );

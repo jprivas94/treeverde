@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import useKanbanStore from "../store/kanbanStore";
 import { profileApi } from "../services/api";
+import { broadcastProfileUpdate } from "../services/sessionSync";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
@@ -137,6 +138,11 @@ export default function EditProfileModal({ onClose }) {
         name: updatedUser.name,
         profileImage: updatedUser.profileImage,
       });
+      // Propagar el cambio de perfil a las demás pestañas (BroadcastChannel)
+      broadcastProfileUpdate({
+        name: updatedUser.name,
+        profileImage: updatedUser.profileImage,
+      });
       setSuccessMsg("Perfil actualizado exitosamente");
       setTimeout(() => onClose(), 1500);
     } catch (err) {
@@ -177,7 +183,7 @@ export default function EditProfileModal({ onClose }) {
               onClick={() => fileInputRef.current?.click()}
               className="relative cursor-pointer group">
               <div className={"w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold overflow-hidden border-2 transition-all duration-200 " + (preview ? "border-emerald-400 shadow-md" : "border-gray-200 bg-emerald-500 hover:border-emerald-300")}>
-                {preview ? <img src={preview} alt="Profile" className="w-full h-full object-cover" /> : (user?.name?.charAt(0).toUpperCase() || "&#x1F464;")}
+                {preview ? <img src={preview} alt="Profile" className="w-full h-full object-cover" loading="lazy" /> : (user?.name?.charAt(0).toUpperCase() || "&#x1F464;")}
               </div>
               <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-all duration-200">
                 <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
@@ -210,7 +216,7 @@ export default function EditProfileModal({ onClose }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-            <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" placeholder="Tu nombre" />
+            <input type="text" required data-testid="profile-name-input" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" placeholder="Tu nombre" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Nueva contrase&ntilde;a <span className="text-gray-400 font-normal">(dejar vac&iacute;o para mantener)</span></label>
@@ -237,7 +243,7 @@ export default function EditProfileModal({ onClose }) {
           )}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 text-sm border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">Cancelar</button>
-            <button type="submit" disabled={saving || uploadingImage} className="flex-1 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg transition">
+            <button data-testid="profile-save-button" type="submit" disabled={saving || uploadingImage} className="flex-1 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg transition">
               {saving ? "Guardando..." : "Guardar cambios"}
             </button>
           </div>

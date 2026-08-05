@@ -13,7 +13,7 @@ export default function GoodbyeModal() {
         {/* Avatar */}
         <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-3xl font-bold shadow-lg mb-4 overflow-hidden">
           {user?.profileImage ? (
-            <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
+            <img src={user.profileImage} alt="" className="w-full h-full object-cover" loading="lazy" />
           ) : (
             user?.name?.charAt(0).toUpperCase() || '👤'
           )}

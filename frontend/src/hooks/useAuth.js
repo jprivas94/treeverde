@@ -1,16 +1,17 @@
 import { useEffect } from 'react';
 import useKanbanStore from '../store/kanbanStore';
 import { authApi } from '../services/api';
+import { broadcastLogin } from '../services/sessionSync';
 
 export default function useAuth() {
-  const { user, token, setUser, logout, setLoading, setError, setShowWelcome } = useKanbanStore();
+  const { user, token, loading, setUser, logout, setLoading, setError, setShowWelcome } = useKanbanStore();
 
   useEffect(() => {
     if (token && !user) {
       setLoading(true);
       authApi
         .me()
-        .then((u) => setUser(u, token))
+        .then((u) => setUser(u, token, u.supabaseToken))
         .catch(() => logout())
         .finally(() => setLoading(false));
     }
@@ -21,7 +22,9 @@ export default function useAuth() {
     setError(null);
     try {
       const data = await authApi.login(email, password);
-      setUser(data.user, data.token);
+      setUser(data.user, data.token, data.supabaseToken);
+      // Propagar el login a las demás pestañas (sincronización de sesión)
+      broadcastLogin(data.token);
       setShowWelcome(true);
       return data.user;
     } catch (err) {
@@ -37,7 +40,8 @@ export default function useAuth() {
     setError(null);
     try {
       const data = await authApi.register(name, email, password);
-      setUser(data.user, data.token);
+      setUser(data.user, data.token, data.supabaseToken);
+      broadcastLogin(data.token);
       setShowWelcome(true);
       return data.user;
     } catch (err) {
@@ -48,6 +52,6 @@ export default function useAuth() {
     }
   };
 
-  return { user, token, isAuthenticated: !!token, login, register, logout };
+  return { user, token, loading, isAuthenticated: !!token, login, register, logout };
 }
 

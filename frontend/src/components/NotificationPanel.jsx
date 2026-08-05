@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { notificationsApi } from '../services/api';
+import { isRealtimeActive } from '../services/realtime';
+import { broadcastNotificationsRead } from '../services/sessionSync';
 import useKanbanStore from '../store/kanbanStore';
 
 function timeAgo(dateStr) {
@@ -20,10 +22,14 @@ const TYPE_ICONS = {
   COMPLETED: '\u2705',
   SHARED: '\u{1F91D}',
   SUBTASK_COMPLETED: '\u2705',
+  INVITE_ACCEPTED: '\u{1F389}',
   INFO: '\u2139\uFE0F'
 };
 
 export default function NotificationPanel() {
+  // Nota: useKanbanStore() sin selector ya suscribe a TODO el store, así que
+  // cuando cambia supabaseToken el componente re-renderiza y isRealtimeActive()
+  // (que lee el store vía getState) se re-evalúa automáticamente.
   const { token } = useKanbanStore();
   const notifications = useKanbanStore((s) => s.notifications);
   const unreadCount = useKanbanStore((s) => s.unreadCount);
@@ -34,6 +40,13 @@ export default function NotificationPanel() {
   const [loading, setLoading] = useState(false);
   const panelRef = useRef(null);
 
+  // Con realtime activo (credenciales + supabaseToken) las notificaciones
+  // llegan solas vía el canal de Supabase: se salta el polling de 30s y solo
+  // se hace la carga inicial (los eventos INSERT ya actualizan el store).
+  // La condición vive en isRealtimeActive() para no desincronizarla del guard
+  // de connectRealtime().
+  const realtimeActive = isRealtimeActive();
+
   useEffect(() => {
     if (!token) return;
     const load = () => {
@@ -42,9 +55,10 @@ export default function NotificationPanel() {
         .catch(() => {});
     };
     load();
+    if (realtimeActive) return undefined;
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
-  }, [token, setNotifications]);
+  }, [token, realtimeActive, setNotifications]);
 
   const handleToggle = useCallback(() => {
     if (!open) {
@@ -53,7 +67,12 @@ export default function NotificationPanel() {
       notificationsApi.getAll()
         .then((data) => {
           setNotifications(data.notifications, data.unreadCount);
-          notificationsApi.markRead().then(() => markAllRead()).catch(() => {});
+          notificationsApi.markRead().then(() => {
+            markAllRead();
+            // Propagar el "leídas" a las demás pestañas (BroadcastChannel):
+            // el backend ya se marcó, las otras solo aplican el estado local.
+            broadcastNotificationsRead();
+          }).catch(() => {});
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -76,13 +95,14 @@ export default function NotificationPanel() {
   return (
     <div className="relative" ref={panelRef}>
       <button
+        data-testid="notification-button"
         onClick={handleToggle}
         className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition text-lg leading-none"
         title="Notificaciones"
       >
         <span>{'\u{1F514}'}</span>
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 sm:top-0 sm:-right-0 min-w-[16px] h-4 flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full px-1 leading-none shadow-sm">
+          <span data-testid="unread-badge" className="absolute -top-0.5 -right-0.5 sm:top-0 sm:-right-0 min-w-[16px] h-4 flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full px-1 leading-none shadow-sm">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}

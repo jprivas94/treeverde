@@ -1,65 +1,37 @@
 import { useState, useEffect, useRef } from 'react';
 import useKanbanStore from '../store/kanbanStore';
-import DatePickerModal from './DatePickerModal';
-import ImageUploadModal from './ImageUploadModal';
-import ImageViewModal from './ImageViewModal';
+import TaskFormFields from './TaskFormFields';
 import SearchableUserSelect from './SearchableUserSelect';
-
-function parseLocalDate(str) {
-  if (!str) return new Date();
-  const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function formatLocalDate(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-const PRIORITIES = [
-  { value: 'LOW', label: '\uD83D\uDFE2 Baja', color: 'text-green-600 bg-green-50 border-green-200' },
-  { value: 'MEDIUM', label: '\uD83D\uDFE1 Media', color: 'text-amber-600 bg-amber-50 border-amber-200' },
-  { value: 'HIGH', label: '\uD83D\uDFE0 Alta', color: 'text-orange-600 bg-orange-50 border-orange-200' },
-  { value: 'CRITICAL', label: '\uD83D\uDD34 Cr\u00edtica', color: 'text-red-600 bg-red-50 border-red-200' },
-];
+import { tasksApi, usersApi } from '../services/api';
+import { getCloudinaryThumb } from '../utils/images';
 
 export default function CreateTaskModal({ onClose }) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('MEDIUM');
-  const [dueDate, setDueDate] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tagsInput, setTagsInput] = useState('');
-  const [assigneeId, setAssigneeId] = useState('');
+  const [form, setForm] = useState({
+    title: '', description: '', priority: 'MEDIUM', dueDate: '',
+    tags: '', assigneeId: '', images: [], subtasks: [],
+  });
   const [users, setUsers] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [showImageUpload, setShowImageUpload] = useState(false);
-  const [images, setImages] = useState([]);
-  const [viewingImageIndex, setViewingImageIndex] = useState(null);
-
-  // Subtareas
-  const [subtasks, setSubtasks] = useState([]);
-  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
-  let subtaskIdCounter = 0;
 
   // Compartir
   const [sharedUsers, setSharedUsers] = useState([]);
   const [inviteUserId, setInviteUserId] = useState('');
 
-  const { addTask, token, user } = useKanbanStore();
+  // Invitación por URL: el asignado se define con el enlace (deshabilita
+  // el selector de asignado y el de compartidos; se pueden generar varias URLs)
+  const [inviteMode, setInviteMode] = useState(false);
+  const [createdTask, setCreatedTask] = useState(null);
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+
+  const { addTask, user } = useKanbanStore();
   const titleRef = useRef(null);
-  const descriptionRef = useRef(null);
+  // El foco inicial lo maneja TaskFormFields vía autoFocus + titleRef
 
   useEffect(() => {
-    if (titleRef.current) titleRef.current.focus();
+    usersApi.getAll().then(setUsers).catch(() => {});
   }, []);
-
-  // Auto-ajuste textarea
-  useEffect(() => {
-    const el = descriptionRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
-  }, [description]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -69,31 +41,30 @@ export default function CreateTaskModal({ onClose }) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  useEffect(() => {
-    fetch('/api/users', { headers: { Authorization: 'Bearer ' + token } })
-      .then((r) => r.json()).then(setUsers).catch(() => {});
-  }, [token]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!form.title.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          priority,
-          dueDate: dueDate || null,
-          tags: tagsInput.trim(),
-          assigneeId: assigneeId || null,
-          images,
-          subtasks
-        })
+      const task = await tasksApi.create({
+        title: form.title.trim(),
+        description: form.description.trim(),
+        priority: form.priority,
+        dueDate: form.dueDate || null,
+        tags: form.tags.trim(),
+        assigneeId: inviteMode ? null : (form.assigneeId || null),
+        images: form.images,
+        subtasks: form.subtasks
       });
-      const task = await res.json();
+
+      // Modo invitación: generar el enlace (como asignado) y mostrar el panel
+      if (inviteMode) {
+        const inv = await tasksApi.getInviteUrl(task.id, 'assignee');
+        addTask(task);
+        setCreatedTask(task);
+        setInviteUrl(inv.inviteUrl);
+        return;
+      }
 
       // Compartir con los usuarios seleccionados después de crear
       if (sharedUsers.length > 0) {
@@ -101,23 +72,16 @@ export default function CreateTaskModal({ onClose }) {
           // Buscar el userId real del usuario compartido
           const targetUser = users.find((u) => u.name === su.name || u.id === su.id);
           if (targetUser && targetUser.id !== user?.id) {
-            await fetch('/api/tasks/' + task.id + '/share', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-              body: JSON.stringify({ userId: targetUser.id })
-            }).catch(() => {});
+            await tasksApi.share(task.id, targetUser.id).catch(() => {});
           }
         }
         // Recargar tarea para incluir los shares
-        const reloadRes = await fetch('/api/tasks/' + task.id, {
-          headers: { Authorization: 'Bearer ' + token }
-        });
-        if (reloadRes.ok) {
-          const reloaded = await reloadRes.json();
+        try {
+          const reloaded = await tasksApi.getById(task.id);
           addTask(reloaded);
           onClose();
           return;
-        }
+        } catch { /* si falla la recarga, se usa la tarea original */ }
       }
 
       addTask(task);
@@ -129,31 +93,115 @@ export default function CreateTaskModal({ onClose }) {
     }
   };
 
-  // ─── Sub-tareas ──────────────────────────────
-  const handleAddSubtask = () => {
-    const stTitle = newSubtaskTitle.trim();
-    if (!stTitle) return;
-    subtaskIdCounter++;
-    setSubtasks((prev) => [...prev, { id: String(subtaskIdCounter + Date.now()), title: stTitle, completed: false }]);
-    setNewSubtaskTitle('');
-  };
-
-  const handleToggleSubtask = (stId) => {
-    setSubtasks((prev) => prev.map((st) =>
-      st.id === stId ? { ...st, completed: !st.completed } : st
-    ));
-  };
-
-  const handleRemoveSubtask = (stId) => {
-    setSubtasks((prev) => prev.filter((st) => st.id !== stId));
-  };
-
-  const completedCount = subtasks.filter((st) => st.completed).length;
-
-  // ─── Compartir ───────────────────────────────
   const handleRemoveShare = (userId) => {
     setSharedUsers((prev) => prev.filter((u) => u.id !== userId));
   };
+
+  // Regenerar el enlace de invitación (el creador puede crear las veces que quiera)
+  const handleGenerateInvite = async () => {
+    if (!createdTask) return;
+    setGeneratingInvite(true);
+    try {
+      const inv = await tasksApi.getInviteUrl(createdTask.id, 'assignee');
+      setInviteUrl(inv.inviteUrl);
+      setInviteCopied(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    } catch {
+      // portapapeles bloqueado: noop
+    }
+  };
+
+  // ─── Panel de éxito con el enlace de invitación ───
+  if (createdTask) {
+    return (
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div
+          className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto border border-emerald-100 animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* ── Encabezado en degradado ── */}
+          <div className="relative bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 px-5 sm:px-6 pt-7 sm:pt-8 pb-14 text-center">
+            <button
+              onClick={onClose}
+              className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white/80 hover:text-white flex items-center justify-center text-lg leading-none transition"
+              aria-label="Cerrar"
+            >
+              &times;
+            </button>
+            <div className="w-16 h-16 mx-auto rounded-full bg-white/20 backdrop-blur-sm border-2 border-white/40 shadow-lg flex items-center justify-center text-3xl">
+              {'\u2705'}
+            </div>
+            <h2 className="mt-3 text-xl font-bold text-white tracking-tight">¡Tarea creada!</h2>
+            <p className="mt-1 text-sm text-emerald-50/95 font-medium truncate px-2">«{createdTask.title}»</p>
+          </div>
+
+          {/* ── Contenido centrado ── */}
+          <div className="px-6 pb-6 -mt-7">
+            <div className="bg-white rounded-2xl border border-emerald-100 shadow-xl p-4 sm:p-5 space-y-4 text-center mt-10">
+              <p className="text-sm text-gray-600 leading-relaxed mt-2.5">
+                Comparte este enlace: quien lo abra podrá iniciar sesión o crear
+                una cuenta y quedará como <strong className="text-emerald-700">asignado</strong> de la tarea.
+              </p>
+
+              <div className="flex items-center gap-2 text-left">
+                <div className="flex-1 min-w-0 flex items-center gap-2 bg-emerald-50 border-2 border-emerald-200 focus-within:border-emerald-400 hover:border-emerald-300 rounded-xl px-3 py-2 transition">
+                  <span className="text-emerald-500 text-sm" aria-hidden="true">{'\u{1F517}'}</span>
+                  <input
+                    readOnly
+                    value={inviteUrl}
+                    onFocus={(e) => e.target.select()}
+                    className="flex-1 min-w-0 bg-transparent text-xs text-gray-700 font-medium outline-none"
+                    aria-label="Enlace de invitación"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyInvite}
+                  className={`px-3 sm:px-4 py-2.5 text-xs font-bold rounded-xl transition shrink-0 shadow-sm ${
+                    inviteCopied
+                      ? 'bg-teal-100 text-teal-700 border border-teal-300'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
+                  }`}
+                >
+                  {inviteCopied ? '✓ Copiado' : 'Copiar'}
+                </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-0 pt-1">
+                <button
+                  type="button"
+                  onClick={handleGenerateInvite}
+                  disabled={generatingInvite}
+                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 underline underline-offset-2 disabled:opacity-50 transition text-center"
+                >
+                  {generatingInvite ? 'Generando...' : 'Generar otro enlace'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-5 py-2.5 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl shadow-md shadow-emerald-600/25 transition w-full sm:w-auto"
+                >
+                  Listo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -170,7 +218,7 @@ export default function CreateTaskModal({ onClose }) {
             <label className="block text-[10px] font-medium text-gray-500 mb-0.5">{'\u{1F464}'} Creado por</label>
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
               {user?.profileImage ? (
-                <img src={user.profileImage} alt="" className="w-4 h-4 rounded-full object-cover" />
+                <img src={getCloudinaryThumb(user.profileImage, 64)} alt="" className="w-4 h-4 rounded-full object-cover" loading="lazy" />
               ) : (
                 <span className="w-4 h-4 rounded-full bg-violet-400 text-white flex items-center justify-center text-[8px] font-bold">
                   {user?.name?.charAt(0).toUpperCase() || '?'}
@@ -180,222 +228,38 @@ export default function CreateTaskModal({ onClose }) {
             </div>
           </div>
 
-          {/* ── Layout de dos columnas: Izquierda (Título + Descripción) | Derecha (resto) ── */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            {/* ═══ LADO IZQUIERDO: Título + Descripción ═══ */}
-            <div className="md:col-span-3 bg-gray-50/70 border border-gray-100 rounded-xl p-3 h-full flex flex-col gap-2">
-              {/* Título */}
-              <div className="shrink-0">
-                <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Título *</label>
-                <input
-                  ref={titleRef}
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
-                  placeholder="Ej: Implementar login"
-                />
-              </div>
+          {/* ── Formulario compartido (dos columnas) ── */}
+          <TaskFormFields
+            values={form}
+            onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+            users={users}
+            user={user}
+            autoFocus
+            titleRef={titleRef}
+            disableAssignee={inviteMode}
+          />
 
-              {/* Descripción + Sub-tareas */}
-              <div className="flex-1 flex flex-col min-h-0">
-                <label className="block text-[10px] font-medium text-gray-600 mb-0 shrink-0">
-                  Descripción {subtasks.length > 0 && (
-                    <span className="text-[10px] text-gray-400 font-normal ml-1">
-                      &middot; {'\uD83D\uDCCB'} {completedCount}/{subtasks.length}
-                    </span>
-                  )}
-                </label>
-                <div className="flex-1 border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 overflow-hidden bg-white flex flex-col min-h-0">
-                  <textarea
-                    ref={descriptionRef}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full flex-1 min-h-0 px-3 py-1.5 text-sm border-0 outline-none resize-none focus:ring-0"
-                    placeholder="Descripción..."
-                  />
-
-                  {/* Separador y sub-tareas */}
-                  <div className="shrink-0">
-                    <div className="border-t border-gray-100" />
-                    <div className="px-1.5 py-1">
-                      {/* Lista de sub-tareas */}
-                      {subtasks.length > 0 && (
-                        <div className="space-y-0 mb-0.5">
-                          {subtasks.map((st) => (
-                            <div
-                              key={st.id}
-                              className="flex items-center gap-1.5 px-1 py-0.5 rounded-lg hover:bg-gray-50 transition group"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleToggleSubtask(st.id)}
-                                className={`w-3 h-3 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                                  st.completed
-                                    ? 'bg-emerald-500 border-emerald-500 text-white'
-                                    : 'border-gray-300 hover:border-emerald-400'
-                                }`}
-                              >
-                                {st.completed && (
-                                  <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                  </svg>
-                                )}
-                              </button>
-                              <span
-                                className={`text-[10px] flex-1 ${
-                                  st.completed ? 'line-through text-gray-400' : 'text-gray-700'
-                                }`}
-                              >
-                                {st.title}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSubtask(st.id)}
-                                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-[10px] leading-none"
-                                title="Eliminar"
-                              >
-                                &times;
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Input para nueva sub-tarea */}
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={newSubtaskTitle}
-                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
-                          className="flex-1 px-1.5 py-0.5 text-[10px] border border-gray-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                          placeholder="Nueva sub-tarea..."
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddSubtask}
-                          disabled={!newSubtaskTitle.trim()}
-                          className="px-1.5 py-0.5 text-[9px] font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50 transition"
-                        >
-                          + Añadir
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ═══ LADO DERECHO: Asignar a, Prioridad, Fecha, Etiquetas, Imagen ═══ */}
-            <div className="md:col-span-2 h-full">
-              <div className="bg-gray-50/70 border border-gray-100 rounded-xl p-3 h-full flex flex-col justify-center space-y-1.5">
-                {/* Asignar a */}
-                <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-0">Asignar a</label>
-                  <SearchableUserSelect
-                    value={assigneeId}
-                    onChange={setAssigneeId}
-                    users={users}
-                    placeholder="Sin asignar"
-                    size="small"
-                  />
-                </div>
-
-                {/* Prioridad */}
-                <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-0">Prioridad</label>
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                    className={'w-full px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none ' + (PRIORITIES.find((p) => p.value === priority)?.color || 'bg-white border-gray-200 text-gray-700')}
-                  >
-                    {PRIORITIES.map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Fecha límite */}
-                <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-0">Fecha l&iacute;mite</label>
-                  <input
-                    type="text" readOnly value={dueDate ? parseLocalDate(dueDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
-                    onClick={() => setShowDatePicker(true)}
-                    placeholder="Seleccionar"
-                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer bg-white"
-                  />
-                  {showDatePicker && (
-                    <DatePickerModal
-                      value={dueDate ? parseLocalDate(dueDate) : null}
-                      onSelect={(date) => setDueDate(date ? formatLocalDate(date) : '')}
-                      onClose={() => setShowDatePicker(false)}
-                    />
-                  )}
-                </div>
-
-                {/* Etiquetas */}
-                <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-0">Etiquetas</label>
-                  <input
-                    type="text"
-                    value={tagsInput}
-                    onChange={(e) => setTagsInput(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                  placeholder="frontend, bug, urgente"
-                  />
-                </div>
-
-                {/* Imágenes */}
-                <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-0">Imágenes</label>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setShowImageUpload(true)}
-                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition"
-                    >
-                      <span>{'\u{1F4F7}'}</span>
-                      Subir
-                    </button>
-                    {images.length > 0 && (
-                      <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full font-medium">
-                        {images.length} {'\u2705'}
-                      </span>
-                    )}
-                  </div>
-                  {images.length > 0 && (
-                    <div className="flex gap-1 mt-1 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
-                      {images.map((url, idx) => (
-                        <div key={idx} className="relative group shrink-0 mt-1 cursor-pointer">
-                          <img src={url} alt={`Img ${idx+1}`} className="w-10 h-10 rounded-lg object-cover border border-gray-200" />
-                          <div
-                            onClick={() => setViewingImageIndex(idx)}
-                            className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-lg transition flex items-center justify-center pointer-events-none"
-                          >
-                            <span className="text-white text-[8px] font-semibold opacity-0 group-hover:opacity-100 transition bg-black/60 px-1.5 py-0.5 rounded-md pointer-events-auto select-none">
-                              {'\u{1F441}\uFE0F'} Ver
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
-                            className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[7px] flex items-center justify-center hover:bg-red-600 opacity-0 group-hover:opacity-100 transition z-10"
-                          >
-                            &times;
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Compartir con otros usuarios ── */}
+          {/* ── Invitación por URL / Compartir con otros usuarios ── */}
           <div className="pt-2 mt-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none mb-1">
+              <input
+                type="checkbox"
+                checked={inviteMode}
+                onChange={(e) => setInviteMode(e.target.checked)}
+                className="w-3.5 h-3.5 accent-emerald-600"
+              />
+              <span className="text-[10px] font-medium text-gray-600">
+                {'\u{1F4E8}'} Crear enlace de invitación (el asignado se elige con el enlace)
+              </span>
+            </label>
+
+            {inviteMode ? (
+              <p className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 leading-relaxed">
+                En modo invitación el selector de asignado y el de compartidos quedan
+                deshabilitados. El enlace se genera al crear la tarea.
+              </p>
+            ) : (
+            <>
             <label className="block text-[10px] font-medium text-gray-600 mb-1">
               {'\u{1F91D}'} Compartir con
             </label>
@@ -407,7 +271,7 @@ export default function CreateTaskModal({ onClose }) {
                     className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200"
                   >
                     {u.profileImage ? (
-                      <img src={u.profileImage} alt="" className="w-3 h-3 rounded-full object-cover" />
+                      <img src={getCloudinaryThumb(u.profileImage, 64)} alt="" className="w-3 h-3 rounded-full object-cover" loading="lazy" />
                     ) : (
                       <span className="w-3 h-3 rounded-full bg-indigo-400 text-white flex items-center justify-center text-[6px] font-bold">
                         {u.name.charAt(0).toUpperCase()}
@@ -443,27 +307,9 @@ export default function CreateTaskModal({ onClose }) {
                 filter={(u) => u.id !== user?.id && !sharedUsers.some((su) => su.id === u.id)}
               />
             </div>
+            </>
+            )}
           </div>
-
-          {showImageUpload && (
-            <ImageUploadModal
-              currentImages={images}
-              onSave={(newImages) => {
-                setImages(newImages);
-                setShowImageUpload(false);
-              }}
-              onClose={() => setShowImageUpload(false)}
-            />
-          )}
-
-          {viewingImageIndex !== null && (
-            <ImageViewModal
-              images={images.map((url, i) => ({ imageUrl: url, title: `Imagen ${i + 1}` }))}
-              currentIndex={viewingImageIndex}
-              onClose={() => setViewingImageIndex(null)}
-              onNavigate={(idx) => setViewingImageIndex(idx)}
-            />
-          )}
 
           <div className="grid grid-cols-2 gap-2 pt-0.5">
             <button type="button" onClick={onClose}

@@ -74,3 +74,48 @@ body {
 .animate-loading-bar {
   animation: loading-bar 1.8s ease-in-out infinite;
 }
+
+/* ─── Fondo degradado animado (pantallas de autenticación) ── */
+@keyframes gradient-pan {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-pan {
+  background-size: 200% 200%;
+  animation: gradient-pan 16s ease infinite;
+}
+
+/* ─── Luces decorativas que flotan ── */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(24px, -20px) scale(1.06);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 14s ease-in-out infinite;
+}
+
+.animate-float-slower {
+  animation: float-slow 20s ease-in-out infinite reverse;
+}
+
+/* ─── Respetar preferencia de movimiento reducido ── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-gradient-pan,
+  .animate-float-slow,
+  .animate-float-slower {
+    animation: none;
+  }
+}

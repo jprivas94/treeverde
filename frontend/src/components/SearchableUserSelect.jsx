@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { getCloudinaryThumb } from '../utils/images';
 
 export default function SearchableUserSelect({
   value,
@@ -152,7 +153,7 @@ export default function SearchableUserSelect({
                   className={'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition hover:bg-emerald-50 ' + (value === u.id ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700')}
                 >
                   {u.profileImage ? (
-                    <img src={u.profileImage} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                    <img src={getCloudinaryThumb(u.profileImage, 64)} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" loading="lazy" />
                   ) : (
                     <span className="w-5 h-5 rounded-full bg-gray-300 text-white flex items-center justify-center text-[8px] font-bold shrink-0">
                       {u.name?.charAt(0).toUpperCase() || '?'}

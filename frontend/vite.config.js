@@ -3,6 +3,21 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // manualChunks debe ser función en Vite 8 (rolldown)
+        // Separa las dependencias pesadas del bundle inicial
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@hello-pangea/dnd')) return 'dnd';
+            if (id.includes('zustand')) return 'zustand';
+            if (id.includes('react') || id.includes('scheduler') || id.includes('react-dom')) return 'react-vendor';
+          }
+        }
+      }
+    }
+  },
   server: {
     port: 5173,
     proxy: {

@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
+import { getJwtSecret } from '../utils/config.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-dev-only';
+const JWT_SECRET = getJwtSecret();
 
 export default function authenticate(req, res, next) {
   const header = req.headers.authorization;

@@ -77,7 +77,7 @@ const STATUS_FILTERS = [
   { value: 'nodate', label: 'Sin fecha' },
 ];
 
-export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, currentUser }) {
+export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
@@ -106,7 +106,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
       });
   }, [tasks, archivedTasks]);
 
-  const { completedData, filteredCount } = useMemo(() => {
+  const completedData = useMemo(() => {
     const completedTasks = tasks.filter(
       (t) => t.status === 'DONE' || t.status === 'ARCHIVED'
     );
@@ -161,7 +161,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, 
       });
     }
 
-    return { completedData: { all: filtered }, filteredCount: filtered.length };
+    return { all: filtered };
   }, [tasks, archivedTasks, search, priorityFilter, statusFilter, sortOrder]);
 
   const resetPage = () => setPage(1);

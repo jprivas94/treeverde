@@ -1,43 +1,20 @@
 import { Draggable } from '@hello-pangea/dnd';
+import {
+  STATUS_DOTS,
+  STATUS_LABELS,
+  PRIORITY_CONFIG,
+  BOARD_STATUSES,
+  TRANSITION_LABELS,
+  STATUS_BTN_COLORS,
+} from '../constants/kanbanConfig';
+import { getCloudinaryThumb } from '../utils/images';
 
-const priorityDot = {
-  TODO: 'bg-amber-400',
-  IN_PROGRESS: 'bg-blue-400',
-  DONE: 'bg-emerald-400',
-  ARCHIVED: 'bg-red-400'
-};
-
-const statusLabels = {
-  TODO: 'Por Hacer',
-  IN_PROGRESS: 'En Progreso',
-  DONE: 'Revisión',
-  ARCHIVED: 'Terminado'
-};
-
-const priorityConfig = {
-  LOW: { label: 'Baja', class: 'text-green-700 bg-green-100' },
-  MEDIUM: { label: 'Media', class: 'text-amber-700 bg-amber-100' },
-  HIGH: { label: 'Alta', class: 'text-orange-700 bg-orange-100' },
-  CRITICAL: { label: 'Crítica', class: 'text-red-700 bg-red-100' },
-};
-
-const STATUS_ORDER = ['TODO', 'IN_PROGRESS', 'DONE', 'ARCHIVED'];
-
-const transitionLabels = {
-  'TODO->IN_PROGRESS': 'En Progreso',
-  'IN_PROGRESS->TODO': 'Por Hacer',
-  'IN_PROGRESS->DONE': 'Revisión',
-  'DONE->IN_PROGRESS': 'En Progreso',
-  'DONE->ARCHIVED': 'Terminar',
-  'ARCHIVED->DONE': 'Restaurar',
-};
-
-const columnBtnColors = {
-  TODO: { bg: 'bg-amber-100', text: 'text-amber-700', hoverBg: 'hover:bg-amber-200', hoverText: 'hover:text-amber-800' },
-  IN_PROGRESS: { bg: 'bg-blue-100', text: 'text-blue-700', hoverBg: 'hover:bg-blue-200', hoverText: 'hover:text-blue-800' },
-  DONE: { bg: 'bg-emerald-100', text: 'text-emerald-700', hoverBg: 'hover:bg-emerald-200', hoverText: 'hover:text-emerald-800' },
-  ARCHIVED: { bg: 'bg-red-100', text: 'text-red-700', hoverBg: 'hover:bg-red-200', hoverText: 'hover:text-red-800' },
-};
+const priorityDot = STATUS_DOTS;
+const statusLabels = STATUS_LABELS;
+const priorityConfig = PRIORITY_CONFIG;
+const STATUS_ORDER = BOARD_STATUSES;
+const transitionLabels = TRANSITION_LABELS;
+const columnBtnColors = STATUS_BTN_COLORS;
 
 function formatDate(dateStr) {
   if (!dateStr) return null;
@@ -164,10 +141,11 @@ export default function TaskCard({ task, index, onEdit, onMove, onViewImage, isS
                       }}
                     >
                       <img
-                        src={url}
+                        src={getCloudinaryThumb(url, 160)}
                         alt={`${task.title} ${idx + 1}`}
                         className="w-14 h-14 object-cover rounded-lg border border-gray-200 transition group-hover:shadow-md group-hover:border-gray-300"
                         draggable={false}
+                        loading="lazy"
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center pointer-events-none">
                         <span className="text-white text-[9px] font-medium opacity-0 group-hover:opacity-100 transition bg-black/50 px-1.5 py-0.5 rounded-md">
@@ -214,7 +192,7 @@ export default function TaskCard({ task, index, onEdit, onMove, onViewImage, isS
                 <span className="flex items-center gap-1 text-[10px] text-gray-400" title={`Creado por ${task.creator.name}`}>
                   <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold overflow-hidden shrink-0">
                     {task.creator.profileImage ? (
-                      <img src={task.creator.profileImage} alt="" className="w-full h-full object-cover" />
+                      <img src={getCloudinaryThumb(task.creator.profileImage, 64)} alt="" className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <span className="w-full h-full flex items-center justify-center bg-indigo-400">
                         {task.creator.name.charAt(0).toUpperCase()}
@@ -229,7 +207,7 @@ export default function TaskCard({ task, index, onEdit, onMove, onViewImage, isS
                 <span className="flex items-center gap-1 text-[10px] text-gray-500" title={`Asignado a ${task.assignee.name}`}>
                   <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold overflow-hidden shrink-0">
                     {task.assignee.profileImage ? (
-                      <img src={task.assignee.profileImage} alt="" className="w-full h-full object-cover" />
+                      <img src={getCloudinaryThumb(task.assignee.profileImage, 64)} alt="" className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <span className="w-full h-full flex items-center justify-center bg-emerald-500">
                         {task.assignee.name.charAt(0).toUpperCase()}

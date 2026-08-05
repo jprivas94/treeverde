@@ -11,9 +11,10 @@
     "db:generate": "npx prisma generate",
     "postinstall": "prisma generate",
     "build": "prisma generate",
-    "vercel-build": "prisma generate",
+    "vercel-build": "prisma migrate deploy && prisma generate",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "node --experimental-test-module-mocks --test"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
@@ -21,11 +22,14 @@
     "cloudinary": "^2.10.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "express-rate-limit": "^8.6.1",
     "jsonwebtoken": "^9.0.2",
-    "prisma": "^6.0.0"
+    "prisma": "^6.0.0",
+    "resend": "^6.18.1"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
-    "globals": "^17.7.0"
+    "globals": "^17.7.0",
+    "supertest": "^7.2.2"
   }
 }
