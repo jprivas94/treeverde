@@ -227,7 +227,7 @@ carol@test.com / 123456 (Carol)
 
   | Variable | Valor |
   |---|---|
-  | `VITE_API_URL` | URL del backend desplegado (ej. `https://backend.vercel.app`) — en prod no hay proxy de Vite |
+  | `VITE_API_URL` | URL del backend desplegado **terminando en `/api`** (ej. `https://backend.vercel.app/api`) — en prod no hay proxy de Vite |
   | `VITE_SUPABASE_URL` | URL del proyecto Supabase |
   | `VITE_SUPABASE_ANON_KEY` | Anon key de Supabase |
 

@@ -9,7 +9,8 @@
 -- se omiten (realtime local sigue funcionando sin RLS).
 --
 -- Nota: el rol postgres/superuser que usa Prisma (DATABASE_URL) hace
--- BYPASS de RLS, por lo que el backend no se ve afectado.DO $$
+-- BYPASS de RLS, por lo que el backend no se ve afectado.
+DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'auth') THEN
     -- ── Habilitar RLS (idempotente) ──

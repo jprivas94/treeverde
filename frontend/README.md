@@ -137,7 +137,7 @@ src/
 npm run build    # Genera ./dist/
 ```
 Conectar repositorio a [vercel.com](https://vercel.com) y listo.
-En producción define `VITE_API_URL` apuntando al dominio del backend (en dev se usa el proxy de Vite: `/api` → `http://localhost:3001`).
+En producción define `VITE_API_URL` apuntando al dominio del backend **terminando en `/api`** (ej. `https://backend.vercel.app/api`; el cliente suma rutas como `/auth/login` a esta base). En dev se usa el proxy de Vite: `/api` → `http://localhost:3001`).
 Para **realtime**, define `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (Dashboard → Project Settings → API) y, en el backend, `SUPABASE_JWT_SECRET` (mismo dashboard) para que el servidor acuñe el token que autentica la conexión con RLS.
 
 ### Backend → Vercel Serverless o Railway

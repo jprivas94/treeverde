@@ -14,6 +14,9 @@ const useKanbanStore = create((set, get) => ({
   supabaseToken: null,
   tasks: [],
   archivedTasks: [],
+  // Estado de carga/error usado por useAuth (login/register/me) y los formularios
+  loading: false,
+  error: null,
   // true cuando las tareas ya fueron cargadas (evita re-fetch al montar Board)
   tasksLoaded: false,
   // true si hay más páginas de tareas por cargar (paginación)
@@ -205,6 +208,8 @@ const useKanbanStore = create((set, get) => ({
 
   // ─── UI ────────────────────────────────────
   showWelcome: false,
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error }),
   setShowWelcome: (showWelcome) => set({ showWelcome })
 }));
 
