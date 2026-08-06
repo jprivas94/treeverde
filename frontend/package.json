@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "node --test src/constants/kanbanConfig.test.js src/store/kanbanStore.test.js src/utils/images.test.js src/utils/date.test.js src/utils/tasks.test.js src/services/api.test.js src/services/realtime.test.js src/services/sessionSync.test.js src/services/sessionSync.e2e.test.js",
-    "test:components": "node --experimental-test-module-mocks --experimental-require-module --import tsx --test src/components/*.test.jsx",
+    "test:components": "node --experimental-test-module-mocks --import tsx --test src/components/*.test.jsx",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
