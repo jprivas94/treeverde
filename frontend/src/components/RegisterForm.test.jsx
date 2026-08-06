@@ -1,40 +1,33 @@
 // ─── RegisterForm: render, validacion local, submit y errores ─────────
-// El DOM (jsdom) debe crearse ANTES de cargar react-dom: ver test/setupDom.js
-// useAuth se mockea con mock.module (mismo patron que LoginForm.test.jsx).
 import '../test/setupDom';
-import { test, afterEach, mock } from 'node:test';
+import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { render, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import RegisterForm from './RegisterForm.jsx';
+import useKanbanStore from '../store/kanbanStore';
+import { stubFetch } from '../test/fetchStub';
 
-// ─── Mock de useAuth (antes de importar RegisterForm) ─────────────────
-let registerMock = async () => {};
-let loadingMock = false;
+const realFetch = globalThis.fetch;
 
-mock.module('../hooks/useAuth', {
-  exports: {
-    default: () => ({ login: async () => {}, register: registerMock, loading: loadingMock }),
-  },
+beforeEach(() => {
+  useKanbanStore.setState({ loading: false, user: null, token: null });
 });
-
-const { default: RegisterForm } = await import('./RegisterForm.jsx');
 
 afterEach(() => {
   cleanup();
-  registerMock = async () => {};
-  loadingMock = false;
+  globalThis.fetch = realFetch;
+  useKanbanStore.setState({ loading: false, user: null, token: null });
 });
 
 const renderRegister = (props = {}) =>
   render(<RegisterForm onSwitch={props.onSwitch || (() => {})} invite={props.invite} />);
 
-const fillForm = (name, email, password) => {
-  const utils = renderRegister();
+const fillForm = (utils, name, email, password) => {
   fireEvent.change(utils.getByPlaceholderText('Tu nombre'), { target: { value: name } });
   fireEvent.change(utils.getByPlaceholderText('tu@email.com'), { target: { value: email } });
   fireEvent.change(utils.getByPlaceholderText('Mínimo 6 caracteres'), { target: { value: password } });
   fireEvent.click(utils.getByRole('button', { name: 'Crear Cuenta' }));
-  return utils;
 };
 
 test('RegisterForm: renderiza titulo, campos y boton', () => {
@@ -47,46 +40,83 @@ test('RegisterForm: renderiza titulo, campos y boton', () => {
 
 test('RegisterForm: campos vacios muestran errores locales y no llaman a register', async () => {
   let called = false;
-  registerMock = async () => { called = true; };
+  stubFetch([
+    {
+      method: 'POST',
+      path: '/auth/register',
+      body: { user: { id: 'u1' }, token: 'tok' },
+    },
+  ]);
+
   const { getByText, getByRole } = renderRegister();
   fireEvent.click(getByRole('button', { name: 'Crear Cuenta' }));
   await waitFor(() => getByText('El nombre es requerido'));
   getByText('El email es requerido');
   getByText('La contraseña es requerida');
-  assert.equal(called, false, 'register no debe llamarse con campos vacios');
+  assert.equal(useKanbanStore.getState().user, null, 'register no debe llamarse con campos vacios');
 });
 
 test('RegisterForm: contrasena corta muestra minimo 6 caracteres', async () => {
-  let called = false;
-  registerMock = async () => { called = true; };
-  const { getByText } = fillForm('Ana', 'ana@test.com', '123');
-  await waitFor(() => getByText(/6 caracteres/));
-  assert.equal(called, false, 'register no debe llamarse con contrasena corta');
+  stubFetch([
+    {
+      method: 'POST',
+      path: '/auth/register',
+      body: { user: { id: 'u1' }, token: 'tok' },
+    },
+  ]);
+
+  const utils = renderRegister();
+  fillForm(utils, 'Ana', 'ana@test.com', '123');
+  await waitFor(() => utils.getByText(/6 caracteres/));
+  assert.equal(useKanbanStore.getState().user, null, 'register no debe llamarse con contrasena corta');
 });
 
 test('RegisterForm: submit valido llama a register con nombre, email y contrasena', async () => {
-  let called = null;
-  registerMock = async (name, email, password) => { called = { name, email, password }; };
-  fillForm('Ana', 'ana@test.com', '123456');
-  await waitFor(() =>
-    assert.deepEqual(called, { name: 'Ana', email: 'ana@test.com', password: '123456' })
-  );
+  stubFetch([
+    {
+      method: 'POST',
+      path: '/auth/register',
+      body: { user: { id: 'u1', name: 'Ana' }, token: 'tok' },
+    },
+  ]);
+
+  const utils = renderRegister();
+  fillForm(utils, 'Ana', 'ana@test.com', '123456');
+  await waitFor(() => assert.deepEqual(useKanbanStore.getState().user, { id: 'u1', name: 'Ana' }));
 });
 
 test('RegisterForm: email ya registrado muestra el error bajo email', async () => {
-  registerMock = async () => { throw new Error('El email ya está registrado'); };
-  const { getByText } = fillForm('Ana', 'ana@test.com', '123456');
-  await waitFor(() => getByText(/registrado/));
+  stubFetch([
+    {
+      method: 'POST',
+      path: '/auth/register',
+      status: 400,
+      body: { error: 'El email ya está registrado' },
+    },
+  ]);
+
+  const utils = renderRegister();
+  fillForm(utils, 'Ana', 'ana@test.com', '123456');
+  await waitFor(() => utils.getByText(/registrado/));
 });
 
 test('RegisterForm: error generico se muestra como error general', async () => {
-  registerMock = async () => { throw new Error('Algo salio mal'); };
-  const { getByText } = fillForm('Ana', 'ana@test.com', '123456');
-  await waitFor(() => getByText('Algo salio mal'));
+  stubFetch([
+    {
+      method: 'POST',
+      path: '/auth/register',
+      status: 400,
+      body: { error: 'Algo salio mal' },
+    },
+  ]);
+
+  const utils = renderRegister();
+  fillForm(utils, 'Ana', 'ana@test.com', '123456');
+  await waitFor(() => utils.getByText('Algo salio mal'));
 });
 
 test('RegisterForm: loading muestra skeleton en vez del form', () => {
-  loadingMock = true;
+  useKanbanStore.setState({ loading: true });
   const { getByText, queryByPlaceholderText } = renderRegister();
   getByText('Creando tu cuenta...');
   assert.equal(queryByPlaceholderText('Tu nombre'), null, 'el form no debe renderizarse durante el loading');
@@ -99,14 +129,13 @@ test('RegisterForm: invite muestra la tarjeta con el titulo y el creador', () =>
   getByText(/por Carol/);
 });
 
-
 test('RegisterForm: los errores de campo se limpian al volver a teclear', async () => {
   const { getByRole, getByText, getByPlaceholderText, queryByText } = renderRegister();
   fireEvent.click(getByRole('button', { name: 'Crear Cuenta' }));
   await waitFor(() => getByText('El nombre es requerido'));
   getByText('El email es requerido');
   getByText('La contraseña es requerida');
-  // Al teclear el nombre, su error desaparece
+
   fireEvent.change(getByPlaceholderText('Tu nombre'), { target: { value: 'Ana' } });
   await waitFor(() => assert.equal(queryByText('El nombre es requerido'), null));
   getByText('El email es requerido');

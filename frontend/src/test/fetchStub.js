@@ -18,7 +18,13 @@ export function stubFetch(handlers) {
     calls.push({ method, path, body: options.body });
     for (const h of sorted) {
       if (h.method === method && (h.path === '*' || path.includes(h.path))) {
-        return { ok: true, json: async () => h.body };
+        const status = h.status || 200;
+        const ok = h.ok !== undefined ? h.ok : status >= 200 && status < 300;
+        return {
+          ok,
+          status,
+          json: async () => (typeof h.body === 'function' ? h.body({ method, path, body: options.body ? JSON.parse(options.body) : null }) : h.body),
+        };
       }
     }
     // Llamada inesperada → fallar ruidoso (evita regresiones silenciosas)
