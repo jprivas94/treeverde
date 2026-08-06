@@ -2,7 +2,7 @@ import { Droppable } from '@hello-pangea/dnd';
 import TaskCard from './TaskCard';
 import { getStatusConfig } from '../constants/kanbanConfig';
 
-export default function Column({ column, onEditTask, onMoveTask, onViewImage, fixedHeight, todoRef, isSharedUserForTask }) {
+export default function Column({ column, onEditTask, onMoveTask, onViewImage, onDeleteTask, canDeleteForTask, fixedHeight, todoRef, isSharedUserForTask }) {
   const colors = getStatusConfig(column.id);
 
   return (
@@ -34,16 +34,16 @@ export default function Column({ column, onEditTask, onMoveTask, onViewImage, fi
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`flex-1 p-3 space-y-2 sm:space-y-3 overflow-y-auto column-scroll min-h-[80px] sm:min-h-[120px] transition-colors ${
-              snapshot.isDraggingOver ? 'bg-black/5' : ''
+              snapshot.isDraggingOver ? 'bg-black/5 dark:bg-white/10' : ''
             }`}
           >
             {column.tasks.length === 0 && !snapshot.isDraggingOver && (
-              <div className="flex items-center justify-center h-24 text-xs text-gray-400 italic">
+              <div className="flex items-center justify-center h-24 text-xs text-gray-400 dark:text-gray-500 italic">
                 Arrastra tareas aquí
               </div>
             )}
             {column.tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} onViewImage={onViewImage} isSharedUser={isSharedUserForTask?.(task)} />
+              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} onViewImage={onViewImage} onDelete={canDeleteForTask?.(task) ? onDeleteTask : undefined} isSharedUser={isSharedUserForTask?.(task)} />
             ))}
             {provided.placeholder}
           </div>

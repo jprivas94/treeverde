@@ -1,21 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import useKanbanStore from '../store/kanbanStore';
-import TaskFormFields, { formatDateForInput } from './TaskFormFields';
+import TaskFormFields from './TaskFormFields';
 import TaskDetailsView from './TaskDetailsView';
+import SearchableUserSelect from './SearchableUserSelect';
 import { getUserColor } from '../constants/kanbanConfig';
-import { getCloudinaryThumb } from '../utils/images';
 import { tasksApi, usersApi } from '../services/api';
-
-function parseSubtasks(raw) {
-  try {
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
+import { parseSubtasks } from '../utils/tasks';
+import { formatDateForInput } from '../utils/date';
+import Avatar from './Avatar';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 export default function EditTaskModal({ task, onClose, readOnly, sharedView, userColor }) {
-  const { user } = useKanbanStore();
+  const user = useKanbanStore((s) => s.user);
   const canManageShares = user?.id === task.creator?.id || user?.id === task.assignee?.id;
+  // El asignado (que no es el creador) no puede cambiar a quién asignar ni la fecha límite
+  const isAssigneeOnly = user?.id === task.assignee?.id && user?.id !== task.creator?.id;
 
   // Subtareas de la vista (sharedView) — estado propio para reflejar toggles al instante
   const [viewSubtasks, setViewSubtasks] = useState(() => parseSubtasks(task.subtasks));
@@ -33,7 +32,10 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
   }));
   const [users, setUsers] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [sharedUsers, setSharedUsers] = useState(task.shares?.map((s) => s.user) || []);
+  // Select para elegir con quién compartir
+  const [inviteUserId, setInviteUserId] = useState('');
   // Invitación por URL (edición): quien acepte el enlace queda como compartido
   const [inviteUrl, setInviteUrl] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -45,14 +47,23 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
     usersApi.getAll().then(setUsers).catch(() => {});
   }, []);
 
+  // Búsqueda server-side con debounce (desde SearchableUserSelect).
+  // El contador descarta respuestas fuera de orden al escribir rápido.
+  const searchSeq = useRef(0);
+  const handleUserSearch = useCallback(async (q) => {
+    const seq = ++searchSeq.current;
+    const data = await usersApi.getAll({ search: q }).catch(() => null);
+    if (data && seq === searchSeq.current) setUsers(data);
+  }, []);
+
   // Cerrar con tecla ESC
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !showDeleteConfirm) onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, showDeleteConfirm]);
 
   // ─── sharedView: toggle de subtarea con persistencia inmediata ───
   const handleViewSubtaskToggle = async (stId) => {
@@ -96,6 +107,29 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
   };
 
   // ─── Compartir ──────────────────────────────
+  // Compartir con un usuario elegido en el select (se comparte al instante)
+  const handleAddShare = async (userId) => {
+    if (!userId) return;
+    const target = users.find((u) => u.id === userId);
+    if (!target || target.id === user?.id) return;
+    setInviteUserId('');
+    setSharedUsers((prev) => (prev.some((u) => u.id === userId) ? prev : [...prev, target]));
+    try {
+      await tasksApi.share(task.id, userId);
+      useKanbanStore.setState((state) => ({
+        tasks: state.tasks.map((t) =>
+          t.id === task.id
+            ? { ...t, shares: [...(t.shares || []).filter((s) => s.userId !== userId && s.user?.id !== userId), { userId, user: target }] }
+            : t
+        )
+      }));
+    } catch (err) {
+      console.error(err);
+      // Rollback del chip optimista si la compartición no se pudo persistir
+      setSharedUsers((prev) => prev.filter((u) => u.id !== userId));
+    }
+  };
+
   const handleRemoveShare = async (userId) => {
     try {
       await tasksApi.unshare(task.id, userId);
@@ -138,7 +172,7 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Eliminar esta tarea?')) return;
+    setShowDeleteConfirm(false);
     try {
       await tasksApi.remove(task.id);
       useKanbanStore.setState({ tasks: useKanbanStore.getState().tasks.filter((t) => t.id !== task.id) });
@@ -150,10 +184,10 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
   if (sharedView || readOnly) {
     return (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2.5 sm:p-3" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2.5 sm:p-3" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-bold text-gray-900">Ver Tarea</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">Ver Tarea</h2>
+            <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
           </div>
           <TaskDetailsView
             task={{ ...task, subtasks: viewSubtasks }}
@@ -171,26 +205,20 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
   // ─── Modo edición ────────────────────────────
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2.5 sm:p-3" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2.5 sm:p-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold text-gray-900">Editar Tarea</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">Editar Tarea</h2>
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
         </div>
 
         <div>
           <form onSubmit={handleSubmit} className="space-y-2">
             {/* ── Creado por ── */}
             <div>
-              <label className="block text-[10px] font-medium text-gray-500 mb-0">{'\u{1F464}'} Creado por</label>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
-                {task.creator?.profileImage ? (
-                  <img src={getCloudinaryThumb(task.creator.profileImage, 64)} alt="" className="w-4 h-4 rounded-full object-cover" loading="lazy" />
-                ) : (
-                  <span className="w-4 h-4 rounded-full bg-violet-400 text-white flex items-center justify-center text-[8px] font-bold">
-                    {task.creator?.name?.charAt(0).toUpperCase() || '?'}
-                  </span>
-                )}
-                <span className="text-[11px] text-gray-700 font-medium">{task.creator?.name || 'Desconocido'}</span>
+              <label className="block text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-0">{'\u{1F464}'} Creado por</label>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <Avatar user={task.creator} sizeClass="w-4 h-4 text-[8px]" fallbackClass="bg-violet-400 text-white" />
+                <span className="text-[11px] text-gray-700 dark:text-gray-300 font-medium">{task.creator?.name || 'Desconocido'}</span>
               </div>
             </div>
 
@@ -203,11 +231,13 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
               autoFocus
               titleRef={titleRef}
               onSubtaskToggle={handleSubtaskToggle}
+              isAssigneeOnly={isAssigneeOnly}
+              onUserSearch={handleUserSearch}
             />
 
             {/* ── Compartir con otros usuarios ── */}
             <div className="pt-2 mt-2">
-              <label className="block text-[10px] font-medium text-gray-600 mb-1">
+              <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1">
                 {'\u{1F91D}'} {canManageShares ? 'Compartir con' : 'Compartida con'}
               </label>
               {sharedUsers.length > 0 && (
@@ -220,13 +250,7 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
                         className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border"
                         style={{ backgroundColor: color + '18', borderColor: color + '40', color }}
                       >
-                        {u.profileImage ? (
-                          <img src={getCloudinaryThumb(u.profileImage, 64)} alt="" className="w-3 h-3 rounded-full object-cover" loading="lazy" />
-                        ) : (
-                          <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white" style={{ backgroundColor: color }}>
-                            {u.name.charAt(0).toUpperCase()}
-                          </span>
-                        )}
+                        <Avatar user={u} sizeClass="w-3 h-3 text-[6px]" fallbackClass="text-white" style={{ backgroundColor: color }} />
                         <span>{u.name}</span>
                         {canManageShares && (
                           <button onClick={() => handleRemoveShare(u.id)} className="ml-0.5 transition" style={{ color }} title="Eliminar">
@@ -239,30 +263,51 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
                 </div>
               )}
               {sharedUsers.length === 0 && (
-                <p className="text-[10px] text-gray-400 mb-1 italic">No compartida con nadie</p>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1 italic">No compartida con nadie</p>
               )}
               {canManageShares && (
-                <div className="space-y-1.5">
-                  <button
-                    type="button"
-                    onClick={handleGenerateInvite}
-                    disabled={inviteLoading}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition disabled:opacity-60"
-                  >
-                    {inviteLoading ? (
-                      <><div className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /> Generando...</>
-                    ) : (
-                      <>📨 Generar enlace de invitación (compartido)</>
-                    )}
-                  </button>
+                <>
+                  {/* Select: elegir con quién compartir */}
+                  <div className="mt-1">
+                    <SearchableUserSelect
+                      value={inviteUserId}
+                      onChange={handleAddShare}
+                      users={users}
+                      placeholder="Seleccionar usuario..."
+                      size="small"
+                      onSearch={handleUserSearch}
+                      filter={(u) => u.id !== user?.id && !sharedUsers.some((su) => su.id === u.id)}
+                    />
+                  </div>
+
+                  {/* Botón Generar: centrado, debajo del select. Desaparece al generarse el enlace */}
+                  {!inviteUrl && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={handleGenerateInvite}
+                        disabled={inviteLoading}
+                        title="Generar una URL para compartir esta tarea"
+                        className="flex items-center justify-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-600/30 rounded-lg transition disabled:opacity-60"
+                      >
+                        {inviteLoading ? (
+                          <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generando enlace...</>
+                        ) : (
+                          <>🔗 Generar enlace para compartir la tarea</>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
                   {inviteUrl && (
-                    <>
+                    <div className="space-y-1.5 pt-1.5">
                       <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap">ENLACE URL:</span>
                         <input
                           readOnly
                           value={inviteUrl}
                           onFocus={(e) => e.target.select()}
-                          className="flex-1 min-w-0 px-2.5 py-1.5 text-[10px] bg-white border border-gray-200 rounded-lg text-gray-700 outline-none"
+                          className="flex-1 min-w-0 px-2.5 py-1.5 text-[10px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 outline-none"
                           aria-label="Enlace de invitación"
                         />
                         <button
@@ -282,23 +327,19 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
                           Generar otro enlace
                         </button>
                       </div>
-                      <p className="text-[9px] text-gray-400 leading-relaxed">
-                        Quien abra el enlace se registra (o inicia sesión) y queda
-                        como usuario compartido de la tarea.
-                      </p>
-                    </>
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
 
-            {user?.id === task.creator?.id && (
-              <button type="button" onClick={handleDelete}
-                className="w-full py-2 text-xs border border-red-200 rounded-lg text-red-600 font-medium hover:bg-red-50 transition">Eliminar tarea</button>
-            )}
-            <div className="grid grid-cols-2 gap-2 pt-0.5">
+            <div className={"grid gap-2 pt-0.5 " + (user?.id === task.creator?.id ? 'grid-cols-3' : 'grid-cols-2')}>
               <button type="button" onClick={onClose}
-                className="py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">Cancelar</button>
+                className="py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition">Cancelar</button>
+              {user?.id === task.creator?.id && (
+                <button type="button" onClick={() => setShowDeleteConfirm(true)}
+                  className="py-1.5 text-xs border border-red-200 dark:border-red-900 rounded-lg text-red-600 dark:text-red-400 font-medium hover:bg-red-50 dark:hover:bg-red-950/40 transition">Eliminar</button>
+              )}
               <button type="submit" disabled={saving}
                 className="py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg transition flex items-center justify-center gap-1.5">
                 {saving ? (
@@ -308,6 +349,10 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
           </form>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmDeleteModal task={task} onConfirm={handleDelete} onCancel={onClose} />
+      )}
     </div>
   );
 }

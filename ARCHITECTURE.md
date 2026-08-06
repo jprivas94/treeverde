@@ -238,6 +238,8 @@ La lógica de autorización es **por recurso** (no por rol) y está centralizada
 | Compartir | Creador o asignado |
 | Eliminar | Solo el creador |
 
+> **Matiz de edición (2026-08):** el asignado que no es el creador puede editar título/descripción/etiquetas/imágenes/subtareas y cambiar el estado, pero **no** puede reasignar la tarea, cambiar la fecha límite ni la prioridad, ni generar enlaces de invitación con rol `assignee`. Esos cambios quedan reservados al creador: el `PUT /api/tasks/:id` ignora `assigneeId`/`dueDate`/`priority` para el asignado (validado en `backend/tests/api.test.js`) y `POST /api/tasks/:id/invite` responde 403 si un asignado pide rol `assignee`.
+
 ### 5.4 Notificaciones (efectos colaterales)
 
 El backend genera notificaciones de forma **transaccional** dentro de los handlers (no hay sistema de eventos/colas):
@@ -415,8 +417,9 @@ Build de Vite + `vite preview`. En producción debe definirse `VITE_API_URL` apu
 | `npm run db:seed` | backend | Datos de prueba |
 | `npm run db:generate` | backend | Regenerar Prisma Client |
 | `npm run lint` | ambos | ESLint |
-| `npm test` | backend | `node --experimental-test-module-mocks --test` — 85 tests: integración con Supertest (auth, tareas, subtasks, status, password reset, share, notificaciones, perfil, upload, users, CORS, mensaje unificado de login) + unitarios (permisos, notificaciones, config, supabaseToken) |
-| `npm test` | frontend | Tests `node:test` — sesión (`sessionSync.test.js`: login/logout/perfil/leídas entre pestañas por BroadcastChannel, idempotencia y limpieza) y e2e de dos pestañas simulado (`sessionSync.e2e.test.js`: login/logout/perfil/leídas propagados por BroadcastChannel) |
+| `npm test` | backend | `node --experimental-test-module-mocks --test` — 122 tests: integración con Supertest (auth, tareas, subtasks, status, password reset, share, notificaciones, perfil, upload, users, búsqueda de usuarios, CORS, mensaje unificado de login, restricciones del asignado, validación de payloads) + unitarios (permisos, notificaciones, config, supabaseToken, paginación, validación) |
+| `npm test` | frontend | Tests `node:test` — 78 tests: config del tablero, store, imágenes, helpers de fecha y tareas, sesión (`sessionSync.test.js`: login/logout/perfil/leídas entre pestañas por BroadcastChannel, idempotencia y limpieza) y e2e de dos pestañas simulado (`sessionSync.e2e.test.js`: login/logout/perfil/leídas propagados por BroadcastChannel) |
+| `npm run test:components` | frontend | 85 tests de componentes con `node:test` + tsx + jsdom + Testing Library (Avatar, SearchableUserSelect, TaskFormFields, DatePickerModal, CompletedTasksPanel, NotificationPanel, CreateTaskModal, EditTaskModal, Board, LoginForm, RegisterForm) — usa `--experimental-test-module-mocks` (igual que el backend) para mockear `@hello-pangea/dnd` en `Board.test.jsx` y capturar el `onDragEnd`, y `useAuth` en los tests de formularios; el setup de DOM (`src/test/setupDom.js`) debe importarse antes que react-dom para que React active el soporte nativo del evento `input` |
 | `npm run test:e2e` | frontend | Tests e2e reales con Playwright (`e2e/session-sync.spec.js`, 3 tests: dos pestañas reales — login/logout, perfil y notificaciones leídas propagados por BroadcastChannel). Requiere backend en :3001 con la BD sembrada y frontend en :5173 (el `webServer` de la config los levanta solo si no están). Cada run hace ~6 logins; el rate limiter de login solo está activo en producción, así que en dev la suite es repetible sin 429 |
 | `npm run build` | frontend | Build de producción Vite |
 
@@ -484,9 +487,9 @@ tasksApi.updateStatus(id, status) ──► PATCH /api/tasks/:id/status
 - OAuth (Google/GitHub) y refresh tokens.
 - Migrar a `react-router` cuando crezcan las vistas.
 - Rate limiting + refresh tokens.
-- Más tests: integración real de subida a Cloudinary (e2e) y tests de componentes con Testing Library.
+- Más tests: el backend ya cuenta con un test de integración real de Cloudinary (`tests/cloudinary.integration.test.js`, opt-in: se salta sin `CLOUDINARY_*` en el entorno y sube+elimina un PNG 1×1) y 85 tests de componentes con Testing Library (incl. `Board.test.jsx` con 12 tests: columna Terminado visible, flujo de archivado, drag & drop vía `onDragEnd` capturado con `mock.module` de `@hello-pangea/dnd`, el botón Historial con su estado vacío y la eliminación desde la tarjeta con `ConfirmDeleteModal` solo para el creador; `LoginForm.test.jsx` y `RegisterForm.test.jsx` con `useAuth` mockeado vía `mock.module`/`exports`; `EditTaskModal.test.jsx` cubre el flujo de eliminación con el modal de confirmación; helpers compartidos en `src/test/boardTestUtils.js`).
 
-**Hecho en la refactorización R1–R6 (2026-07):** suite de tests (`node:test`), singleton de Prisma, helpers de permisos/notificaciones, error handler central, config centralizada del tablero, formulario compartido, cliente API unificado y 3 bugs corregidos (B1–B3). *(Los conteos de tests evolucionan con cada cambio — ver sección 10 para el estado actual: 85 backend / 63 frontend.)*
+**Hecho en la refactorización R1–R6 (2026-07):** suite de tests (`node:test`), singleton de Prisma, helpers de permisos/notificaciones, error handler central, config centralizada del tablero, formulario compartido, cliente API unificado y 3 bugs corregidos (B1–B3). *(Los conteos de tests evolucionan con cada cambio — ver sección 10 para el estado actual: 122 backend (+1 Cloudinary opt-in) / 78 frontend + 53 de componentes.)*
 
 > **Tests de integración (`backend/tests/api.test.js`):** usan Supertest contra la app Express real con el módulo `db.js` (singleton de Prisma) interceptado por `mock.module` (requiere el flag `--experimental-test-module-mocks`). Cubren auth (register/login/me/forgot/reset-password), tareas (CRUD, GET /:id, listado con aislamiento), subtasks (con notificación SUBTASK_COMPLETED), status (con completedAt), share y quitar compartido (con notificación SHARED), ASSIGNED al crear tarea, notificaciones (GET, marcar leídas, eliminar), perfil (PUT /auth/profile), upload (POST /upload/sign con Cloudinary de prueba) y usuarios (GET /api/users). Son herméticos: no requieren BD ni red.
 

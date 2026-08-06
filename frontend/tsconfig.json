@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // JSX automático (react-jsx): los componentes no importan React y tsx
+    // lo respeta para transpilar los tests de componentes (.jsx).
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": false
+  },
+  "include": ["src"]
+}

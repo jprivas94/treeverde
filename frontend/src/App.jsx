@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import useKanbanStore from './store/kanbanStore';
-import { authApi, tasksApi, invitesApi } from './services/api';
+import useTheme from './hooks/useTheme';
+import useSessionRestore from './hooks/useSessionRestore';
+import { tasksApi, invitesApi } from './services/api';
 import { connectRealtime } from './services/realtime';
 import { initSessionSync } from './services/sessionSync';
 import LoginForm from './components/LoginForm';
@@ -25,13 +27,15 @@ if (typeof window !== 'undefined') {
 }
 
 export default function App() {
+  // Modo oscuro: vive en App para que el listener del sistema y la
+  // sincronización entre pestañas funcionen también en las pantallas de auth.
+  const { isDark, toggle } = useTheme();
+
   const token = useKanbanStore((s) => s.token);
   const user = useKanbanStore((s) => s.user);
-  const setUser = useKanbanStore((s) => s.setUser);
-  const logout = useKanbanStore((s) => s.logout);
   const showWelcome = useKanbanStore((s) => s.showWelcome);
-  const setTasks = useKanbanStore((s) => s.setTasks);
   const setToken = useKanbanStore((s) => s.setToken);
+  const setTasks = useKanbanStore((s) => s.setTasks);
   const updateUser = useKanbanStore((s) => s.updateUser);
   const markAllRead = useKanbanStore((s) => s.markAllRead);
   const [authView, setAuthView] = useState('login');
@@ -113,24 +117,8 @@ export default function App() {
     if (token && user && authView !== 'login') setAuthView('login');
   }, [token, user, authView]);
 
-  // Restaurar sesión y precargar tareas EN PARALELO (una sola espera)
-  useEffect(() => {
-    if (token && !user) {
-      Promise.allSettled([authApi.me(), tasksApi.getAll({ limit: TASKS_PAGE_SIZE })]).then(
-        ([meResult, tasksResult]) => {
-          if (meResult.status === 'fulfilled') {
-            setUser(meResult.value, token, meResult.value.supabaseToken);
-            // Solo aplicar tareas si la sesión es válida
-            if (tasksResult.status === 'fulfilled') {
-              setTasks(tasksResult.value, tasksResult.value.length === TASKS_PAGE_SIZE);
-            }
-          } else {
-            logout();
-          }
-        }
-      );
-    }
-  }, [token, user, setUser, setTasks, logout]);
+  // Restaurar sesión y precargar tareas EN PARALELO (hook extraído de App)
+  useSessionRestore();
 
   // Conectar Realtime (Supabase) cuando hay sesión activa: notificaciones
   // y cambios de tareas en vivo. Se desconecta al cerrar sesión o desmontar.
@@ -151,12 +139,15 @@ export default function App() {
   //   leídas (el backend ya se actualizó ahí), solo aplicamos el estado local.
   useEffect(() => {
     return initSessionSync({
-      onLogout: () => logout({ broadcast: false }),
+      // getState() evita depender de la variable de cierre (acción estable del
+    // store) y el falso positivo de exhaustive-deps con los actions de zustand.
+    onLogout: () => useKanbanStore.getState().logout({ broadcast: false }),
+
       onLogin: (incomingToken) => setToken(incomingToken),
       onProfileUpdate: (updates) => updateUser(updates),
       onNotificationsRead: () => markAllRead(),
     });
-  }, [logout, setToken, updateUser, markAllRead]);
+  }, [setToken, updateUser, markAllRead]);
 
   // Mostrar formulario de restablecimiento si hay token
   if (resetToken && authView === 'reset-password' && !token) {
@@ -209,7 +200,7 @@ export default function App() {
           </button>
         </div>
       )}
-      <Board />
+      <Board isDark={isDark} onToggleTheme={toggle} />
       {showWelcome && <WelcomeModal />}
     </ErrorBoundary>
   );

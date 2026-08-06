@@ -184,4 +184,4 @@ carol@test.com / 123456  (Carol)
 | `npm run db:migrate` | Ejecutar migraciones de Prisma |
 | `npm run db:seed` | Poblar la base de datos |
 | `npm run db:generate` | Regenerar Prisma Client |
-| `npm test` | 106 tests (Supertest + unitarios, incluye módulo de email) |
+| `npm test` | 122 tests (Supertest + unitarios, incluye módulo de email) |

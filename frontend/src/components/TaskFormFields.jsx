@@ -5,23 +5,7 @@ import ImageViewModal from './ImageViewModal';
 import SearchableUserSelect from './SearchableUserSelect';
 import { PRIORITIES } from '../constants/kanbanConfig';
 import { getCloudinaryThumb } from '../utils/images';
-
-export function parseLocalDate(str) {
-  if (!str) return new Date();
-  const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-export function formatLocalDate(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-export function formatDateForInput(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toISOString().split('T')[0];
-}
+import { parseLocalDate, formatLocalDate } from '../utils/date';
 
 /**
  * Formulario de tarea reutilizable (dos columnas).
@@ -38,6 +22,8 @@ export default function TaskFormFields({
   descriptionRef,
   onSubtaskToggle, // opcional: se llama con la nueva lista tras un toggle (persistencia inmediata)
   disableAssignee = false, // true → el asignado se definirá vía enlace de invitación (creación)
+  isAssigneeOnly = false, // true → el usuario es el asignado (no creador): no puede cambiar a quién asignar ni la fecha
+  onUserSearch, // opcional: búsqueda server-side de usuarios (debounce en el select)
 }) {
   const {
     title, description, priority, dueDate, tags,
@@ -103,49 +89,49 @@ export default function TaskFormFields({
       {/* ── Layout de dos columnas: Izquierda (Título + Descripción) | Derecha (resto) ── */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
         {/* ═══ LADO IZQUIERDO: Título + Descripción ═══ */}
-        <div className="md:col-span-3 bg-gray-50/70 border border-gray-100 rounded-xl p-3 h-full flex flex-col gap-2">
+        <div className="md:col-span-3 bg-gray-50/70 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-xl p-3 h-full flex flex-col gap-2">
           {/* Título */}
           <div className="shrink-0">
-            <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Título *</label>
+            <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-0.5">Título *</label>
             <input
               ref={titleRefFinal}
               type="text"
               required
               value={title}
               onChange={(e) => set('title', e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
+              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white dark:bg-gray-800 dark:text-gray-100"
               placeholder="Ej: Implementar login"
             />
           </div>
 
           {/* Descripción + Sub-tareas */}
           <div className="flex-1 flex flex-col min-h-0">
-            <label className="block text-[10px] font-medium text-gray-600 mb-0 shrink-0">
+            <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-0 shrink-0">
               Descripción {subtaskList.length > 0 && (
-                <span className="text-[10px] text-gray-400 font-normal ml-1">
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal ml-1">
                   &middot; {'\uD83D\uDCCB'} {completedCount}/{subtaskList.length}
                 </span>
               )}
             </label>
-            <div className="flex-1 border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 overflow-hidden bg-white flex flex-col min-h-0">
+            <div className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 overflow-hidden bg-white dark:bg-gray-800 flex flex-col min-h-0">
               <textarea
                 ref={descRefFinal}
                 value={description}
                 onChange={(e) => set('description', e.target.value)}
-                className="w-full flex-1 min-h-0 px-3 py-1.5 text-sm border-0 outline-none resize-none focus:ring-0"
+                className="w-full flex-1 min-h-0 px-3 py-1.5 text-sm border-0 outline-none resize-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500"
                 placeholder="Descripción..."
               />
 
               {/* Separador y sub-tareas */}
               <div className="shrink-0">
-                <div className="border-t border-gray-100" />
+                <div className="border-t border-gray-100 dark:border-gray-700" />
                 <div className="px-1.5 py-1">
                   {subtaskList.length > 0 && (
                     <div className="space-y-0 mb-0.5">
                       {subtaskList.map((st) => (
                         <div
                           key={st.id}
-                          className="flex items-center gap-1.5 px-1 py-0.5 rounded-lg hover:bg-gray-50 transition group"
+                          className="flex items-center gap-1.5 px-1 py-0.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition group"
                         >
                           <button
                             type="button"
@@ -153,7 +139,7 @@ export default function TaskFormFields({
                             className={`w-3 h-3 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
                               st.completed
                                 ? 'bg-emerald-500 border-emerald-500 text-white'
-                                : 'border-gray-300 hover:border-emerald-400'
+                                : 'border-gray-300 dark:border-gray-600 hover:border-emerald-400'
                             }`}
                           >
                             {st.completed && (
@@ -164,7 +150,7 @@ export default function TaskFormFields({
                           </button>
                           <span
                             className={`text-[10px] flex-1 ${
-                              st.completed ? 'line-through text-gray-400' : 'text-gray-700'
+                              st.completed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
                             }`}
                           >
                             {st.title}
@@ -172,7 +158,7 @@ export default function TaskFormFields({
                           <button
                             type="button"
                             onClick={() => handleRemoveSubtask(st.id)}
-                            className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-[10px] leading-none"
+                            className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition text-[10px] leading-none"
                             title="Eliminar"
                           >
                             &times;
@@ -189,7 +175,7 @@ export default function TaskFormFields({
                       value={newSubtaskTitle}
                       onChange={(e) => setNewSubtaskTitle(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
-                      className="flex-1 px-1.5 py-0.5 text-[10px] border border-gray-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                      className="flex-1 px-1.5 py-0.5 text-[10px] border border-gray-200 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none dark:bg-gray-800 dark:text-gray-100"
                       placeholder="Nueva sub-tarea..."
                     />
                     <button
@@ -209,46 +195,57 @@ export default function TaskFormFields({
 
         {/* ═══ LADO DERECHO: Asignar a, Prioridad, Fecha, Etiquetas, Imagen ═══ */}
         <div className="md:col-span-2 h-full">
-          <div className="bg-gray-50/70 border border-gray-100 rounded-xl p-3 h-full flex flex-col justify-center space-y-1.5">
+          <div className="bg-gray-50/70 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-xl p-3 h-full flex flex-col justify-center space-y-1.5">
             {/* Asignar a */}
-            <div className={disableAssignee ? 'pointer-events-none opacity-50 select-none' : ''}>
-              <label className="block text-[10px] font-medium text-gray-600 mb-0">Asignar a</label>
+            <div className={disableAssignee || isAssigneeOnly ? 'pointer-events-none opacity-50 select-none' : ''}>
+              <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-0">Asignar a</label>
               <SearchableUserSelect
                 value={assigneeId}
                 onChange={(v) => set('assigneeId', v)}
                 users={users}
                 placeholder="Sin asignar"
                 size="small"
+                onSearch={onUserSearch}
               />
               {disableAssignee && (
                 <p className="text-[9px] text-emerald-700 mt-0.5">
                   {'\u{1F4E8}'} Se asignará vía enlace de invitación
                 </p>
               )}
+              {isAssigneeOnly && (
+                <p className="text-[9px] text-amber-700 mt-0.5">
+                  {'\u{1F512}'} Solo el creador puede cambiar al asignado
+                </p>
+              )}
             </div>
 
             {/* Prioridad */}
-            <div>
-              <label className="block text-[10px] font-medium text-gray-600 mb-0">Prioridad</label>
+            <div className={isAssigneeOnly ? 'pointer-events-none opacity-50 select-none' : ''}>
+              <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-0">Prioridad</label>
               <select
                 value={priority}
                 onChange={(e) => set('priority', e.target.value)}
-                className={'w-full px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none ' + (PRIORITIES.find((p) => p.value === priority)?.color || 'bg-white border-gray-200 text-gray-700')}
+                className={'w-full px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none ' + (PRIORITIES.find((p) => p.value === priority)?.color || 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200')}
               >
                 {PRIORITIES.map((p) => (
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
               </select>
+              {isAssigneeOnly && (
+                <p className="text-[9px] text-amber-700 mt-0.5">
+                  {'\u{1F512}'} Solo el creador puede cambiar la prioridad
+                </p>
+              )}
             </div>
 
             {/* Fecha límite */}
-            <div>
-              <label className="block text-[10px] font-medium text-gray-600 mb-0">Fecha l&iacute;mite</label>
+            <div className={isAssigneeOnly ? 'pointer-events-none opacity-50 select-none' : ''}>
+              <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-0">Fecha l&iacute;mite</label>
               <input
                 type="text" readOnly value={dueDate ? parseLocalDate(dueDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
                 onClick={() => setShowDatePicker(true)}
                 placeholder="Seleccionar"
-                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer bg-white"
+                className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer bg-white dark:bg-gray-800 dark:text-gray-100"
               />
               {showDatePicker && (
                 <DatePickerModal
@@ -257,34 +254,39 @@ export default function TaskFormFields({
                   onClose={() => setShowDatePicker(false)}
                 />
               )}
+              {isAssigneeOnly && (
+                <p className="text-[9px] text-amber-700 mt-0.5">
+                  {'\u{1F512}'} Solo el creador puede cambiar la fecha
+                </p>
+              )}
             </div>
 
             {/* Etiquetas */}
             <div>
-              <label className="block text-[10px] font-medium text-gray-600 mb-0">Etiquetas</label>
+              <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-0">Etiquetas</label>
               <input
                 type="text"
                 value={tags}
                 onChange={(e) => set('tags', e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none dark:bg-gray-800 dark:text-gray-100"
                 placeholder="frontend, bug, urgente"
               />
             </div>
 
             {/* Imágenes */}
             <div>
-              <label className="block text-[10px] font-medium text-gray-600 mb-0">Imágenes</label>
+              <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-0">Imágenes</label>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setShowImageUpload(true)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition"
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500 transition"
                 >
                   <span>{'\u{1F4F7}'}</span>
                   Subir
                 </button>
                 {imagesList.length > 0 && (
-                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full font-medium">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full font-medium">
                     {imagesList.length} {'\u2705'}
                   </span>
                 )}
@@ -293,7 +295,7 @@ export default function TaskFormFields({
                 <div className="flex gap-1 mt-1 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
                   {imagesList.map((url, idx) => (
                     <div key={idx} className="relative group shrink-0 mt-1 cursor-pointer">
-                      <img src={getCloudinaryThumb(url, 160)} alt={`Img ${idx+1}`} className="w-10 h-10 rounded-lg object-cover border border-gray-200" loading="lazy" />
+                      <img src={getCloudinaryThumb(url, 160)} alt={`Img ${idx+1}`} className="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-700" loading="lazy" />
                       <div
                         onClick={() => setViewingImageIndex(idx)}
                         className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-lg transition flex items-center justify-center pointer-events-none"

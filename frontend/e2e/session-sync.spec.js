@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
 
+// NOTA sobre el layering de suites (ver también src/services/sessionSync.e2e.test.js):
+// - Este archivo es el e2e REAL (Playwright): corre en CI con backend + BD
+//   efímera, validando la sincronización en dos pestañas del navegador real.
+// - src/services/sessionSync.e2e.test.js es el HARNESS SIMULADO (node:test,
+//   BroadcastChannel mockeado) que corre en `npm test` sin infraestructura.
+// Se complementan, no se sustituyen.
+
 // ─── Verificación e2e real (Playwright) de la sincronización de sesión ──
 // Abre DOS pestañas reales del navegador y verifica la propagación de
 // login/logout/perfil/leídas con el transporte BroadcastChannel

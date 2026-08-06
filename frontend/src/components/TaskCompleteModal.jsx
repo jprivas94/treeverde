@@ -56,10 +56,10 @@ export default function TaskCompleteModal({ task, onConfirm }) {
     ? 'from-red-400 to-rose-500'
     : 'from-blue-400 to-indigo-500';
   const badgeGradient = completedEarly
-    ? 'from-emerald-100 to-teal-100 text-emerald-800 border-emerald-200'
+    ? 'from-emerald-100 to-teal-100 text-emerald-800 border-emerald-200 dark:from-emerald-950/60 dark:to-teal-950/60 dark:text-emerald-300 dark:border-emerald-900'
     : completedLate
-    ? 'from-red-100 to-rose-100 text-red-800 border-red-200'
-    : 'from-blue-100 to-indigo-100 text-blue-800 border-blue-200';
+    ? 'from-red-100 to-rose-100 text-red-800 border-red-200 dark:from-red-950/60 dark:to-rose-950/60 dark:text-red-300 dark:border-red-900'
+    : 'from-blue-100 to-indigo-100 text-blue-800 border-blue-200 dark:from-blue-950/60 dark:to-indigo-950/60 dark:text-blue-300 dark:border-blue-900';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center animate-fade-in">
@@ -67,7 +67,7 @@ export default function TaskCompleteModal({ task, onConfirm }) {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onConfirm} />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl mx-4 max-w-md w-full overflow-hidden animate-scale-in">
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl mx-4 max-w-md w-full overflow-hidden animate-scale-in">
         {/* Header con gradiente */}
         <div className={`bg-gradient-to-r ${gradient} px-6 py-8 text-center`}>
           <div className="text-5xl mb-3">{emoji}</div>
@@ -78,19 +78,19 @@ export default function TaskCompleteModal({ task, onConfirm }) {
         <div className="p-6 space-y-4">
           {/* Nombre de la tarea */}
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Tarea</p>
-            <p className="text-sm font-semibold text-gray-900 mt-0.5">{task.title}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider font-semibold">Tarea</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-0.5">{task.title}</p>
           </div>
 
           {/* Fechas */}
           <div className="grid grid-cols-2 gap-4">
-            <div className={`p-3 rounded-xl border ${completedEarly ? 'bg-emerald-50 border-emerald-200' : completedLate ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
-              <p className="text-xs text-gray-500 mb-0.5">📅 Fecha límite</p>
-              <p className="text-sm font-semibold text-gray-800">{formatDate(task.dueDate)}</p>
+            <div className={`p-3 rounded-xl border ${completedEarly ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900' : completedLate ? 'bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-900' : 'bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900'}`}>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">📅 Fecha límite</p>
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{formatDate(task.dueDate)}</p>
             </div>
-            <div className={`p-3 rounded-xl border ${completedEarly ? 'bg-emerald-50 border-emerald-200' : completedLate ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
-              <p className="text-xs text-gray-500 mb-0.5">✅ Completado</p>
-              <p className="text-sm font-semibold text-gray-800">{formatDate(task.completedAt)}</p>
+            <div className={`p-3 rounded-xl border ${completedEarly ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900' : completedLate ? 'bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-900' : 'bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900'}`}>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">✅ Completado</p>
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{formatDate(task.completedAt)}</p>
             </div>
           </div>
 

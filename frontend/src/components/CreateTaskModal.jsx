@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import useKanbanStore from '../store/kanbanStore';
 import TaskFormFields from './TaskFormFields';
 import SearchableUserSelect from './SearchableUserSelect';
 import { tasksApi, usersApi } from '../services/api';
-import { getCloudinaryThumb } from '../utils/images';
+import Avatar from './Avatar';
 
 export default function CreateTaskModal({ onClose }) {
   const [form, setForm] = useState({
@@ -25,12 +25,22 @@ export default function CreateTaskModal({ onClose }) {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [generatingInvite, setGeneratingInvite] = useState(false);
 
-  const { addTask, user } = useKanbanStore();
+  const addTask = useKanbanStore((s) => s.addTask);
+  const user = useKanbanStore((s) => s.user);
   const titleRef = useRef(null);
+  const searchSeq = useRef(0);
   // El foco inicial lo maneja TaskFormFields vía autoFocus + titleRef
 
   useEffect(() => {
     usersApi.getAll().then(setUsers).catch(() => {});
+  }, []);
+
+  // Búsqueda server-side con debounce (desde SearchableUserSelect).
+  // El contador descarta respuestas fuera de orden al escribir rápido.
+  const handleUserSearch = useCallback(async (q) => {
+    const seq = ++searchSeq.current;
+    const data = await usersApi.getAll({ search: q }).catch(() => null);
+    if (data && seq === searchSeq.current) setUsers(data);
   }, []);
 
   useEffect(() => {
@@ -128,7 +138,7 @@ export default function CreateTaskModal({ onClose }) {
     return (
       <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4" onClick={onClose}>
         <div
-          className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto border border-emerald-100 animate-scale-in"
+          className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto border border-emerald-100 dark:border-emerald-900 animate-scale-in"
           onClick={(e) => e.stopPropagation()}
         >
           {/* ── Encabezado en degradado ── */}
@@ -149,20 +159,20 @@ export default function CreateTaskModal({ onClose }) {
 
           {/* ── Contenido centrado ── */}
           <div className="px-6 pb-6 -mt-7">
-            <div className="bg-white rounded-2xl border border-emerald-100 shadow-xl p-4 sm:p-5 space-y-4 text-center mt-10">
-              <p className="text-sm text-gray-600 leading-relaxed mt-2.5">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-emerald-100 dark:border-emerald-900 shadow-xl p-4 sm:p-5 space-y-4 text-center mt-10">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-2.5">
                 Comparte este enlace: quien lo abra podrá iniciar sesión o crear
-                una cuenta y quedará como <strong className="text-emerald-700">asignado</strong> de la tarea.
+                una cuenta y quedará como <strong className="text-emerald-700 dark:text-emerald-400">asignado</strong> de la tarea.
               </p>
 
               <div className="flex items-center gap-2 text-left">
-                <div className="flex-1 min-w-0 flex items-center gap-2 bg-emerald-50 border-2 border-emerald-200 focus-within:border-emerald-400 hover:border-emerald-300 rounded-xl px-3 py-2 transition">
+                <div className="flex-1 min-w-0 flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-200 dark:border-emerald-900 focus-within:border-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-800 rounded-xl px-3 py-2 transition">
                   <span className="text-emerald-500 text-sm" aria-hidden="true">{'\u{1F517}'}</span>
                   <input
                     readOnly
                     value={inviteUrl}
                     onFocus={(e) => e.target.select()}
-                    className="flex-1 min-w-0 bg-transparent text-xs text-gray-700 font-medium outline-none"
+                    className="flex-1 min-w-0 bg-transparent text-xs text-gray-700 dark:text-gray-200 font-medium outline-none"
                     aria-label="Enlace de invitación"
                   />
                 </div>
@@ -171,7 +181,7 @@ export default function CreateTaskModal({ onClose }) {
                   onClick={handleCopyInvite}
                   className={`px-3 sm:px-4 py-2.5 text-xs font-bold rounded-xl transition shrink-0 shadow-sm ${
                     inviteCopied
-                      ? 'bg-teal-100 text-teal-700 border border-teal-300'
+                      ? 'bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-800'
                       : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
                   }`}
                 >
@@ -184,7 +194,7 @@ export default function CreateTaskModal({ onClose }) {
                   type="button"
                   onClick={handleGenerateInvite}
                   disabled={generatingInvite}
-                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 underline underline-offset-2 disabled:opacity-50 transition text-center"
+                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 underline underline-offset-2 disabled:opacity-50 transition text-center"
                 >
                   {generatingInvite ? 'Generando...' : 'Generar otro enlace'}
                 </button>
@@ -205,26 +215,20 @@ export default function CreateTaskModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2.5 sm:p-3" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2.5 sm:p-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold text-gray-900">Nueva Tarea</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">Nueva Tarea</h2>
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
         </div>
 
         <div>
         <form onSubmit={handleSubmit} className="space-y-2">
           {/* ── Creado por ── */}
           <div>
-            <label className="block text-[10px] font-medium text-gray-500 mb-0.5">{'\u{1F464}'} Creado por</label>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
-              {user?.profileImage ? (
-                <img src={getCloudinaryThumb(user.profileImage, 64)} alt="" className="w-4 h-4 rounded-full object-cover" loading="lazy" />
-              ) : (
-                <span className="w-4 h-4 rounded-full bg-violet-400 text-white flex items-center justify-center text-[8px] font-bold">
-                  {user?.name?.charAt(0).toUpperCase() || '?'}
-                </span>
-              )}
-              <span className="text-[11px] text-gray-700 font-medium">{user?.name || 'Tú'}</span>
+            <label className="block text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-0.5">{'\u{1F464}'} Creado por</label>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <Avatar user={user} sizeClass="w-4 h-4 text-[8px]" fallbackClass="bg-violet-400 text-white" />
+              <span className="text-[11px] text-gray-700 dark:text-gray-300 font-medium">{user?.name || 'Tú'}</span>
             </div>
           </div>
 
@@ -237,6 +241,7 @@ export default function CreateTaskModal({ onClose }) {
             autoFocus
             titleRef={titleRef}
             disableAssignee={inviteMode}
+            onUserSearch={handleUserSearch}
           />
 
           {/* ── Invitación por URL / Compartir con otros usuarios ── */}
@@ -248,19 +253,19 @@ export default function CreateTaskModal({ onClose }) {
                 onChange={(e) => setInviteMode(e.target.checked)}
                 className="w-3.5 h-3.5 accent-emerald-600"
               />
-              <span className="text-[10px] font-medium text-gray-600">
+              <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
                 {'\u{1F4E8}'} Crear enlace de invitación (el asignado se elige con el enlace)
               </span>
             </label>
 
             {inviteMode ? (
-              <p className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 leading-relaxed">
+              <p className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2 leading-relaxed">
                 En modo invitación el selector de asignado y el de compartidos quedan
                 deshabilitados. El enlace se genera al crear la tarea.
               </p>
             ) : (
             <>
-            <label className="block text-[10px] font-medium text-gray-600 mb-1">
+            <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1">
               {'\u{1F91D}'} Compartir con
             </label>
             {sharedUsers.length > 0 && (
@@ -268,19 +273,13 @@ export default function CreateTaskModal({ onClose }) {
                 {sharedUsers.map((u) => (
                   <span
                     key={u.id}
-                    className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200"
+                    className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900"
                   >
-                    {u.profileImage ? (
-                      <img src={getCloudinaryThumb(u.profileImage, 64)} alt="" className="w-3 h-3 rounded-full object-cover" loading="lazy" />
-                    ) : (
-                      <span className="w-3 h-3 rounded-full bg-indigo-400 text-white flex items-center justify-center text-[6px] font-bold">
-                        {u.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+                    <Avatar user={u} sizeClass="w-3 h-3 text-[6px]" fallbackClass="bg-indigo-400 text-white" />
                     <span>{u.name}</span>
                     <button
                       onClick={() => handleRemoveShare(u.id)}
-                      className="ml-0.5 text-indigo-400 hover:text-red-500 transition"
+                      className="ml-0.5 text-indigo-400 dark:text-indigo-400 hover:text-red-500 dark:hover:text-red-400 transition"
                       title="Eliminar"
                     >
                       &times;
@@ -304,6 +303,7 @@ export default function CreateTaskModal({ onClose }) {
                 users={users}
                 placeholder="Seleccionar usuario..."
                 size="small"
+                onSearch={handleUserSearch}
                 filter={(u) => u.id !== user?.id && !sharedUsers.some((su) => su.id === u.id)}
               />
             </div>
@@ -313,7 +313,7 @@ export default function CreateTaskModal({ onClose }) {
 
           <div className="grid grid-cols-2 gap-2 pt-0.5">
             <button type="button" onClick={onClose}
-              className="py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">Cancelar</button>
+              className="py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition">Cancelar</button>
             <button type="submit" disabled={saving}
               className="py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg transition flex items-center justify-center gap-1.5">
               {saving ? (

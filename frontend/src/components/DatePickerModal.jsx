@@ -83,8 +83,8 @@ export default function DatePickerModal({ value, onSelect, onClose }) {
           isSelected
             ? 'bg-emerald-600 text-white shadow-md'
             : isToday
-            ? 'bg-emerald-100 text-emerald-700 font-bold'
-            : 'text-gray-700 hover:bg-gray-100'
+            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold'
+            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
         }`}
       >
         {d}
@@ -96,7 +96,7 @@ export default function DatePickerModal({ value, onSelect, onClose }) {
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xs p-5 animate-scale-in"
+        className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-xs p-5 animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header del mes */}
@@ -104,19 +104,19 @@ export default function DatePickerModal({ value, onSelect, onClose }) {
           <button
             type="button"
             onClick={prevMonth}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 transition"
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-sm font-bold text-gray-900">
+          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
             {MONTHS[viewMonth]} {viewYear}
           </span>
           <button
             type="button"
             onClick={nextMonth}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 transition"
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -127,7 +127,7 @@ export default function DatePickerModal({ value, onSelect, onClose }) {
         {/* Días de la semana */}
         <div className="grid grid-cols-7 gap-0 mb-2">
           {WEEKDAYS.map((day) => (
-            <div key={day} className="w-9 h-8 flex items-center justify-center text-[11px] font-bold text-gray-400 uppercase">
+            <div key={day} className="w-9 h-8 flex items-center justify-center text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase">
               {day}
             </div>
           ))}
@@ -139,11 +139,11 @@ export default function DatePickerModal({ value, onSelect, onClose }) {
         </div>
 
         {/* Acciones */}
-        <div className="flex gap-2 mt-4 pt-3 border-t border-gray-100">
+        <div className="flex gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
           <button
             type="button"
             onClick={handleToday}
-            className="flex-1 py-2 text-xs font-semibold text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition"
+            className="flex-1 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/60 transition"
           >
             Hoy
           </button>
@@ -151,7 +151,7 @@ export default function DatePickerModal({ value, onSelect, onClose }) {
             <button
               type="button"
               onClick={handleClear}
-              className="flex-1 py-2 text-xs font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition"
+              className="flex-1 py-2 text-xs font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/60 transition"
             >
               Limpiar
             </button>
@@ -159,7 +159,7 @@ export default function DatePickerModal({ value, onSelect, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+            className="flex-1 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
           >
             Cancelar
           </button>

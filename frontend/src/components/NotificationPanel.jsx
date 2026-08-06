@@ -2,20 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { notificationsApi } from '../services/api';
 import { isRealtimeActive } from '../services/realtime';
 import { broadcastNotificationsRead } from '../services/sessionSync';
+import { timeAgo } from '../utils/date';
 import useKanbanStore from '../store/kanbanStore';
-
-function timeAgo(dateStr) {
-  const now = Date.now();
-  const diff = now - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'ahora';
-  if (mins < 60) return `hace ${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `hace ${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `hace ${days}d`;
-  return new Date(dateStr).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
-}
 
 const TYPE_ICONS = {
   ASSIGNED: '\u{1F4CC}',
@@ -30,7 +18,7 @@ export default function NotificationPanel() {
   // Nota: useKanbanStore() sin selector ya suscribe a TODO el store, así que
   // cuando cambia supabaseToken el componente re-renderiza y isRealtimeActive()
   // (que lee el store vía getState) se re-evalúa automáticamente.
-  const { token } = useKanbanStore();
+  const token = useKanbanStore((s) => s.token);
   const notifications = useKanbanStore((s) => s.notifications);
   const unreadCount = useKanbanStore((s) => s.unreadCount);
   const setNotifications = useKanbanStore((s) => s.setNotifications);
@@ -97,7 +85,7 @@ export default function NotificationPanel() {
       <button
         data-testid="notification-button"
         onClick={handleToggle}
-        className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition text-lg leading-none"
+        className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition text-lg leading-none"
         title="Notificaciones"
       >
         <span>{'\u{1F514}'}</span>
@@ -115,10 +103,10 @@ export default function NotificationPanel() {
           className="fixed inset-0 bg-black/40 z-40 md:hidden"
           onClick={() => setOpen(false)}
         />
-        <div className="fixed md:absolute z-50 inset-x-4 md:inset-x-auto top-1/2 md:top-full md:mt-2 -translate-y-1/2 md:translate-y-0 mx-auto md:mx-0 w-auto md:w-80 max-w-sm md:max-w-none bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-fade-scale-in">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900">Notificaciones</h3>
-            <span className="text-[10px] text-gray-400">{notifications.length} total</span>
+        <div className="fixed md:absolute z-50 inset-x-4 md:inset-x-auto top-1/2 md:top-full md:mt-2 -translate-y-1/2 md:translate-y-0 mx-auto md:mx-0 w-auto md:w-80 max-w-sm md:max-w-none bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-fade-scale-in">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Notificaciones</h3>
+            <span className="text-[10px] text-gray-400 dark:text-gray-500">{notifications.length} total</span>
           </div>
 
           <div className="max-h-[320px] overflow-y-auto">
@@ -129,25 +117,25 @@ export default function NotificationPanel() {
             ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center px-4">
                 <span className="text-2xl mb-2">{'\u{1F515}'}</span>
-                <p className="text-xs text-gray-500">No hay notificaciones</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">No hay notificaciones</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-gray-50 dark:divide-gray-700">
                 {notifications.map((n) => (
                   <div
                     key={n.id}
                     className={`flex items-start gap-3 px-4 py-3 transition ${
-                      !n.read ? 'bg-emerald-50/60' : 'hover:bg-gray-50'
+                      !n.read ? 'bg-emerald-50/60 dark:bg-emerald-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                     } group/notif`}
                   >
                     <span className="text-base mt-0.5 shrink-0">
                       {TYPE_ICONS[n.type] || TYPE_ICONS.INFO}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-xs leading-relaxed ${!n.read ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                      <p className={`text-xs leading-relaxed ${!n.read ? 'font-semibold text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400'}`}>
                         {n.message}
                       </p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">{timeAgo(n.createdAt)}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{timeAgo(n.createdAt)}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {!n.read && (
@@ -164,7 +152,7 @@ export default function NotificationPanel() {
                             ))
                             .catch(() => {});
                         }}
-                        className="text-gray-300 hover:text-red-500 transition opacity-0 group-hover/notif:opacity-100 text-xs leading-none p-0.5"
+                        className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition opacity-0 group-hover/notif:opacity-100 text-xs leading-none p-0.5"
                         title="Eliminar"
                       >
                         &times;

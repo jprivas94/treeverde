@@ -1,7 +1,7 @@
 # ─── CI de Treeverde ──────────────────────────────────────────────────
 # Corres en cada push a main y en cada PR:
-#   - backend  → lint + 106 tests unitarios (herméticos, sin BD)
-#   - frontend → lint + 66 tests unitarios (node:test)
+#   - backend  → lint + 122 tests unitarios (herméticos, sin BD)
+#   - frontend → lint + 78 tests unitarios (node:test) + 85 de componentes (jsdom)
 #   - e2e      → 3 tests de Playwright contra servidores reales + Postgres
 #                efímera (servicio de GitHub Actions) con migraciones + seed.
 # El backend NO usa dotenv: las env vars llegan por el entorno del proceso,
@@ -60,6 +60,9 @@ jobs:
       - name: Tests unitarios
         working-directory: frontend
         run: npm test
+      - name: Tests de componentes (node:test + tsx + jsdom + Testing Library)
+        working-directory: frontend
+        run: npm run test:components
 
   # ─── E2E: Playwright contra servidores reales + Postgres efímera ─────
   e2e:

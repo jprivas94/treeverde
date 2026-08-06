@@ -2,7 +2,8 @@
 // y garantizan que un fallo de notificación nunca rompa la operación principal.
 import logger from './logger.js';
 
-async function safeCreate(prisma, data) {
+/** Crea una notificación de forma segura (nunca rompe la operación principal). */
+export async function safeCreate(prisma, data) {
   try {
     await prisma.notification.create({ data });
   } catch (err) {

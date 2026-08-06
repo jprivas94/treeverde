@@ -9,6 +9,7 @@ import logger from '../utils/logger.js';
 import { getJwtSecret, getFrontendUrl } from '../utils/config.js';
 import { createSupabaseToken } from '../utils/supabaseToken.js';
 import { sendPasswordResetEmail } from '../utils/email.js';
+import { isValidEmail, isValidName, isValidPassword } from '../utils/validate.js';
 
 const router = Router();
 const JWT_SECRET = getJwtSecret();
@@ -41,6 +42,15 @@ router.post('/register', authLimiter, async (req, res) => {
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
+    }
+    if (!isValidName(name)) {
+      return res.status(400).json({ error: 'El nombre debe tener entre 1 y 100 caracteres' });
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'El email no es válido' });
+    }
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres (máx 100)' });
     }
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -118,11 +128,11 @@ router.put('/profile', authenticate, async (req, res) => {
     // Construir objeto de actualización
     const data = {};
     if (name !== undefined) {
-      if (!name.trim()) return res.status(400).json({ error: 'El nombre no puede estar vacío' });
+      if (!isValidName(name)) return res.status(400).json({ error: 'El nombre debe tener entre 1 y 100 caracteres' });
       data.name = name.trim();
     }
     if (password !== undefined) {
-      if (password.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+      if (!isValidPassword(password)) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
       data.password = await bcrypt.hash(password, 12);
     }
     if (profileImage !== undefined) {

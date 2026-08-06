@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+// NOTA sobre el layering de suites (ver también e2e/session-sync.spec.js):
+// - Este archivo es el HARNESS SIMULADO (node:test): corre en `npm test` sin
+//   navegador ni backend, validando la lógica de sessionSync (BroadcastChannel
+//   mockeado) a nivel de unidad.
+// - e2e/session-sync.spec.js es el e2e REAL (Playwright + backend + BD): valida
+//   el mismo comportamiento en el navegador. Se complementan, no se sustituyen.
+
 // ─── Test e2e (simulación Node) de la sincronización de sesión ────────
 // Simula DOS pestañas del navegador sin dependencias externas:
 // - Cada "pestaña" importa sessionSync.js con un specifier distinto

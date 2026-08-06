@@ -6,11 +6,25 @@ import logger from '../utils/logger.js';
 import { getFrontendUrl } from '../utils/config.js';
 import { canViewTask, canEditTask, canEditSubtasks, canDeleteTask } from '../utils/permissions.js';
 import { notifyAssigned, notifyCompleted, notifyShared, notifySubtaskCompleted } from '../utils/notifications.js';
+import { parsePagination } from '../utils/pagination.js';
+import { isValidStatus, isValidSubtasks, validateTaskCreate, validateTaskUpdate } from '../utils/validate.js';
 
 const router = Router();
 
 // Campos mínimos de usuario incluidos en las tareas (sin email: no se muestra en la UI)
 const USER_SELECT = { id: true, name: true, profileImage: true };
+
+// Include estándar de tareas (relaciones con usuarios mínimos) — usado por
+// GET /, GET /:id, PATCH status y PUT para no repetir el bloque en cada handler.
+const TASK_INCLUDE = {
+  assignee: { select: USER_SELECT },
+  creator: { select: USER_SELECT },
+  shares: {
+    include: {
+      user: { select: USER_SELECT }
+    }
+  }
+};
 
 // Todas las rutas de tasks requieren autenticación
 router.use(authenticate);
@@ -19,8 +33,7 @@ router.use(authenticate);
 // Paginación opcional: ?limit=50&offset=0 (máx 500 por página; sin limit = todas)
 router.get('/', async (req, res) => {
   try {
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 0, 0), 500);
-    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const { limit, offset } = parsePagination(req.query);
 
     const tasks = await prisma.task.findMany({
       where: {
@@ -30,15 +43,7 @@ router.get('/', async (req, res) => {
           { shares: { some: { userId: req.userId } } }
         ]
       },
-      include: {
-        assignee: { select: USER_SELECT },
-        creator: { select: USER_SELECT },
-        shares: {
-          include: {
-            user: { select: USER_SELECT }
-          }
-        }
-      },
+      include: TASK_INCLUDE,
       orderBy: { createdAt: 'desc' },
       ...(limit > 0 ? { take: limit, skip: offset } : {})
     });
@@ -55,15 +60,7 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     const task = await prisma.task.findUnique({
       where: { id },
-      include: {
-        assignee: { select: USER_SELECT },
-        creator: { select: USER_SELECT },
-        shares: {
-          include: {
-            user: { select: USER_SELECT }
-          }
-        }
-      }
+      include: TASK_INCLUDE
     });
     if (!task) return res.status(404).json({ error: 'Tarea no encontrada' });
     if (!canViewTask(task, req.userId)) {
@@ -80,8 +77,11 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { title, description, assigneeId, priority, dueDate, tags, images, subtasks } = req.body;
-    if (!title || !title.trim()) {
-      return res.status(400).json({ error: 'El título es requerido' });
+
+    // Validar el cuerpo ANTES de tocar la base de datos
+    const validationError = validateTaskCreate(req.body);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
 
     // Validar que el usuario asignado existe
@@ -133,7 +133,7 @@ router.patch('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    if (!['TODO', 'IN_PROGRESS', 'DONE', 'ARCHIVED'].includes(status)) {
+    if (!isValidStatus(status)) {
       return res.status(400).json({ error: 'Estado inválido. Use: TODO, IN_PROGRESS, DONE, ARCHIVED' });
     }
 
@@ -165,15 +165,7 @@ router.patch('/:id/status', async (req, res) => {
     const task = await prisma.task.update({
       where: { id },
       data: updateData,
-      include: {
-        assignee: { select: USER_SELECT },
-        creator: { select: USER_SELECT },
-        shares: {
-          include: {
-            user: { select: USER_SELECT }
-          }
-        }
-      }
+      include: TASK_INCLUDE
     });
 
     // Notificar al creador y al asignado cuando la tarea es completada
@@ -217,8 +209,17 @@ router.put('/:id', async (req, res) => {
 
     const { title, description, assigneeId, status, priority, dueDate, tags, images, subtasks } = req.body;
 
+    // Validar solo los campos presentes (la actualización es parcial)
+    const validationError = validateTaskUpdate(req.body);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
+    }
+
+    // El asignado (que no es creador) NO puede reasignar la tarea ni modificar la fecha límite
+    const isAssigneeOnly = existingTask.assigneeId === req.userId && existingTask.creatorId !== req.userId;
+
     // Validar que el usuario asignado existe
-    if (assigneeId) {
+    if (assigneeId && !isAssigneeOnly) {
       const assigneeExists = await prisma.user.findUnique({ where: { id: assigneeId } });
       if (!assigneeExists) {
         return res.status(400).json({ error: 'El usuario asignado no existe' });
@@ -228,10 +229,10 @@ router.put('/:id', async (req, res) => {
     const data = {};
     if (title !== undefined) data.title = title.trim();
     if (description !== undefined) data.description = description.trim();
-    if (assigneeId !== undefined) data.assigneeId = assigneeId || null;
+    if (!isAssigneeOnly && assigneeId !== undefined) data.assigneeId = assigneeId || null;
     if (status !== undefined) data.status = status;
-    if (priority !== undefined) data.priority = priority;
-    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
+    if (!isAssigneeOnly && priority !== undefined) data.priority = priority;
+    if (!isAssigneeOnly && dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
     if (tags !== undefined) data.tags = tags;
     if (images !== undefined) data.images = images;
     if (subtasks !== undefined) data.subtasks = subtasks;
@@ -239,19 +240,11 @@ router.put('/:id', async (req, res) => {
     const task = await prisma.task.update({
       where: { id },
       data,
-      include: {
-        assignee: { select: USER_SELECT },
-        creator: { select: USER_SELECT },
-        shares: {
-          include: {
-            user: { select: USER_SELECT }
-          }
-        }
-      }
+      include: TASK_INCLUDE
     });
 
     // Notificar si se reasignó la tarea a otro usuario
-    if (assigneeId !== undefined && assigneeId !== existingTask.assigneeId && assigneeId !== req.userId) {
+    if (!isAssigneeOnly && assigneeId !== undefined && assigneeId !== existingTask.assigneeId && assigneeId !== req.userId) {
       await notifyAssigned(prisma, {
         userId: assigneeId,
         taskId: id,
@@ -358,6 +351,10 @@ router.post('/:id/invite', async (req, res) => {
     if (!canEditTask(task, req.userId)) {
       return res.status(403).json({ error: 'No tienes permiso para generar el enlace de invitación' });
     }
+    // Solo el creador puede invitar como asignado (quien acepte el enlace quedaría como asignado)
+    if (role === 'assignee' && req.userId !== task.creatorId) {
+      return res.status(403).json({ error: 'Solo el creador puede invitar a alguien como asignado' });
+    }
 
     const inviteToken = crypto.randomBytes(32).toString('hex');
     await prisma.task.update({
@@ -406,8 +403,8 @@ router.patch('/:id/subtasks', async (req, res) => {
     const { id } = req.params;
     const { subtasks } = req.body;
 
-    if (!Array.isArray(subtasks)) {
-      return res.status(400).json({ error: 'subtasks debe ser un array' });
+    if (!isValidSubtasks(subtasks)) {
+      return res.status(400).json({ error: 'subtasks debe ser un array de hasta 50 ítems con título y estado' });
     }
 
     // Verificar permisos (creador, asignado o compartido pueden modificar subtareas)
@@ -446,32 +443,35 @@ router.patch('/:id/subtasks', async (req, res) => {
     if (existingTask.assigneeId && existingTask.assigneeId !== req.userId) notifyUserIds.add(existingTask.assigneeId);
 
     if (notifyUserIds.size > 0) {
-      // Buscar subtareas que cambiaron de no-completada a completada
-      for (const newSt of newSubtasks) {
-        if (!newSt.completed) continue;
-        const oldSt = oldSubtasks.find((s) => s.id === newSt.id);
-        if (oldSt && oldSt.completed) continue;
+      // Subtareas recién completadas por OTRO usuario (con toggledBy)
+      const newlyCompleted = newSubtasks.filter((st) => {
+        if (!st.completed || !st.toggledBy) return false;
+        const oldSt = oldSubtasks.find((s) => s.id === st.id);
+        return !(oldSt && oldSt.completed);
+      });
 
-        const toggledBy = newSt.toggledBy;
-        if (!toggledBy) continue;
-
-        // Obtener nombre de quien la completó
-        const completer = await prisma.user.findUnique({
-          where: { id: toggledBy },
-          select: { name: true }
+      if (newlyCompleted.length > 0) {
+        // Una sola query para todos los completadores (evita N+1)
+        const completerIds = [...new Set(newlyCompleted.map((st) => st.toggledBy))];
+        const completers = await prisma.user.findMany({
+          where: { id: { in: completerIds } },
+          select: { id: true, name: true }
         });
-        const completerName = completer?.name || 'Un usuario';
+        const nameById = new Map(completers.map((u) => [u.id, u.name]));
 
-        // Enviar notificación a cada usuario (creador y/o asignado)
-        for (const targetUserId of notifyUserIds) {
-          if (targetUserId === toggledBy) continue; // No notificar a quien completó
-          await notifySubtaskCompleted(prisma, {
-            userId: targetUserId,
-            taskId: id,
-            completerName,
-            subtaskTitle: newSt.title,
-            taskTitle: existingTask.title
-          });
+        for (const newSt of newlyCompleted) {
+          const completerName = nameById.get(newSt.toggledBy) || 'Un usuario';
+          // Enviar notificación a cada usuario (creador y/o asignado)
+          for (const targetUserId of notifyUserIds) {
+            if (targetUserId === newSt.toggledBy) continue; // No notificar a quien completó
+            await notifySubtaskCompleted(prisma, {
+              userId: targetUserId,
+              taskId: id,
+              completerName,
+              subtaskTitle: newSt.title,
+              taskTitle: existingTask.title
+            });
+          }
         }
       }
     }

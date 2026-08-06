@@ -149,7 +149,8 @@ Ver [README del backend](../backend/README.md) para más detalles.
 
 | Comando | Descripción |
 |---------|-------------|
-| `npm test` | 66 tests con `node:test` (store, config, imágenes, api, realtime, sesión + e2e de dos pestañas con login/logout/perfil/leídas) |
+| `npm test` | 78 tests con `node:test` (store, config, imágenes, fecha, tareas, api, realtime, sesión + e2e de dos pestañas con login/logout/perfil/leídas) |
+| `npm run test:components` | Tests de componentes con `node:test` + tsx + jsdom + Testing Library (Avatar, SearchableUserSelect, TaskFormFields, DatePickerModal, CompletedTasksPanel, NotificationPanel, CreateTaskModal, EditTaskModal, Board). ⚠️ El DOM de jsdom (`src/test/setupDom.js`) se crea a nivel de módulo: los tests deben importarlo ANTES que react-dom (`import '../test/setupDom'` como primer import) o React activa su polyfill legacy de `input` y rompe focus/change |
 | `npm run test:e2e` | 3 tests e2e reales con Playwright (`e2e/session-sync.spec.js`): dos pestañas reales — login/logout, perfil y notificaciones leídas propagados por BroadcastChannel. Requiere el backend en :3001 con la BD sembrada y el frontend en :5173 (el `webServer` de `playwright.config.js` los levanta solo si no están). Cada run hace ~6 logins; el rate limiter de login (20 req/15 min por IP) solo aplica en producción, en dev la suite es repetible sin 429 |
 | `npm run lint` | ESLint (react, react-hooks) |
 | `npm run build` | Build de producción Vite |

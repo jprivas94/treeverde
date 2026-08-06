@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { getCloudinaryThumb } from '../utils/images';
+import Avatar from './Avatar';
 
 export default function SearchableUserSelect({
   value,
@@ -8,7 +8,11 @@ export default function SearchableUserSelect({
   placeholder = 'Seleccionar usuario...',
   filter,
   disabled = false,
-  size = 'default'
+  size = 'default',
+  // Búsqueda en servidor (opcional): se llama con el texto tras el debounce
+  // para que el padre refresque `users` con usersApi.getAll({ search }).
+  onSearch,
+  searchDebounceMs = 250
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -27,6 +31,13 @@ export default function SearchableUserSelect({
     const q = search.toLowerCase().trim();
     return list.filter((u) => u.name.toLowerCase().startsWith(q));
   }, [users, search, filter, isFocused]);
+
+  // Búsqueda en servidor con debounce (solo si el padre la provee)
+  useEffect(() => {
+    if (!onSearch) return undefined;
+    const t = setTimeout(() => onSearch(search.trim()), searchDebounceMs);
+    return () => clearTimeout(t);
+  }, [search, onSearch, searchDebounceMs]);
 
   // Control open state based on focus
   useEffect(() => {
@@ -103,7 +114,7 @@ export default function SearchableUserSelect({
           }}
           placeholder={!selectedUser ? placeholder : undefined}
           disabled={disabled}
-          className={'w-full ' + sizeClasses + ' border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white cursor-pointer pr-8' + (disabled ? ' opacity-60 cursor-not-allowed' : '')}
+          className={'w-full ' + sizeClasses + ' border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white dark:bg-gray-800 dark:text-gray-100 cursor-pointer pr-8' + (disabled ? ' opacity-60 cursor-not-allowed' : '')}
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
           {selectedUser && (
@@ -113,14 +124,14 @@ export default function SearchableUserSelect({
                 e.stopPropagation();
                 handleClear();
               }}
-              className="text-gray-300 hover:text-gray-500 text-xs leading-none p-0.5"
+              className="text-gray-300 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-300 text-xs leading-none p-0.5"
               title="Limpiar seleccion"
             >
               &times;
             </button>
           )}
           <svg
-            className={'w-3.5 h-3.5 text-gray-400 transition-transform ' + (open ? 'rotate-180' : '')}
+            className={'w-3.5 h-3.5 text-gray-400 dark:text-gray-500 transition-transform ' + (open ? 'rotate-180' : '')}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -134,11 +145,11 @@ export default function SearchableUserSelect({
       {open && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-lg border border-gray-200 shadow-lg overflow-hidden animate-fade-scale-in"
+          className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden animate-fade-scale-in"
           role="listbox"
         >
           {filteredUsers.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-gray-400 text-center">
+            <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500 text-center">
               {search.trim() ? 'Sin resultados' : 'No hay usuarios disponibles'}
             </div>
           ) : (
@@ -150,15 +161,9 @@ export default function SearchableUserSelect({
                   role="option"
                   aria-selected={value === u.id}
                   onClick={() => handleSelect(u.id)}
-                  className={'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition hover:bg-emerald-50 ' + (value === u.id ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700')}
+                  className={'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition hover:bg-emerald-50 dark:hover:bg-emerald-950/40 ' + (value === u.id ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-medium' : 'text-gray-700 dark:text-gray-200')}
                 >
-                  {u.profileImage ? (
-                    <img src={getCloudinaryThumb(u.profileImage, 64)} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" loading="lazy" />
-                  ) : (
-                    <span className="w-5 h-5 rounded-full bg-gray-300 text-white flex items-center justify-center text-[8px] font-bold shrink-0">
-                      {u.name?.charAt(0).toUpperCase() || '?'}
-                    </span>
-                  )}
+                  <Avatar user={u} sizeClass="w-5 h-5 text-[8px]" fallbackClass="bg-gray-300 dark:bg-gray-600 text-white" />
                   <span className="truncate">{u.name}</span>
                   {value === u.id && (
                     <svg className="w-3.5 h-3.5 ml-auto text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>

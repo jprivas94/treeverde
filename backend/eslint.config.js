@@ -16,6 +16,12 @@ export default [
       },
     },
     rules: {
+      // Restaurar las reglas recomendadas de @eslint/js (el spread
+      // `...js.configs.recommended` se pisaba con este bloque `rules`:
+      // la propiedad `rules` local ganaba y se perdían ~51 reglas,
+      // incluida `no-undef`.
+      ...js.configs.recommended.rules,
+
       // Dead code detection
       'no-unused-vars': ['warn', {
         vars: 'all',

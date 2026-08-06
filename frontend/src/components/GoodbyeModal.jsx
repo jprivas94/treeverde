@@ -9,7 +9,7 @@ export default function GoodbyeModal() {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl p-10 mx-4 max-w-sm w-full text-center animate-scale-in">
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-10 mx-4 max-w-sm w-full text-center animate-scale-in">
         {/* Avatar */}
         <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-3xl font-bold shadow-lg mb-4 overflow-hidden">
           {user?.profileImage ? (
@@ -20,10 +20,10 @@ export default function GoodbyeModal() {
         </div>
 
         {/* Texto */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
           ¡Hasta luego, {user?.name || 'Usuario'}! 👋
         </h2>
-        <p className="text-gray-500 text-sm leading-relaxed">
+        <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">
           Has cerrado sesión correctamente.
           <br />
           Te esperamos de vuelta pronto.

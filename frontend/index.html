@@ -5,13 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Treeverde — Tablero kanban para organizar, cultivar y completar tus tareas." />
     <meta name="theme-color" content="#059669" />
+    <!-- Fuente Inter (la que declara index.css): cargarla de Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Aplicar el tema ANTES del render (evita parpadeo claro→oscuro al recargar) -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('treeverde-theme');
+          var dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='9' r='6' fill='%2310b981'/%3E%3Ccircle cx='8' cy='11.5' r='3.6' fill='%23059669'/%3E%3Ccircle cx='16' cy='11.5' r='3.6' fill='%23059669'/%3E%3Cpath d='M12 14v6.5' stroke='%23785b2c' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M10.4 21.2h3.2' stroke='%23785b2c' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E"
     />
     <title>Treeverde</title>
   </head>
-  <body class="bg-gray-50 text-gray-900 antialiased">
+  <body class="bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

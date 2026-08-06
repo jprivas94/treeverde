@@ -6,6 +6,12 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+/* Modo oscuro: los controles nativos (select, scrollbars, inputs de fecha)
+   también se renderizan oscuros en lugar de mantenerse claros */
+html.dark {
+  color-scheme: dark;
+}
+
 /* ─── Scrollbar personalizada para las columnas ── */
 .column-scroll::-webkit-scrollbar {
   width: 6px;
@@ -16,6 +22,9 @@ body {
 .column-scroll::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 9999px;
+}
+.dark .column-scroll::-webkit-scrollbar-thumb {
+  background: #374151;
 }
 
 /* ─── Animaciones ── */

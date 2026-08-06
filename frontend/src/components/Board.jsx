@@ -2,14 +2,15 @@ import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } fro
 import { DragDropContext } from '@hello-pangea/dnd';
 import Column from './Column';
 import NotificationPanel from './NotificationPanel';
+import ThemeToggle from './ThemeToggle';
 import { getUserColor } from '../constants/kanbanConfig';
 import useKanbanStore from '../store/kanbanStore';
 import { tasksApi } from '../services/api';
 import { STATUS_NAV, TASKS_PAGE_SIZE } from '../constants/kanbanConfig';
-import { getCloudinaryThumb } from '../utils/images';
 import logger from '../services/logger';
 import TreeLogo from './TreeLogo';
 import TreeSpinner from './TreeSpinner';
+import Avatar from './Avatar';
 
 // ─── Code-splitting: modales y paneles secundarios se cargan bajo demanda ──
 const CreateTaskModal = lazy(() => import('./CreateTaskModal'));
@@ -19,6 +20,7 @@ const GoodbyeModal = lazy(() => import('./GoodbyeModal'));
 const TaskCompleteModal = lazy(() => import('./TaskCompleteModal'));
 const ImageViewModal = lazy(() => import('./ImageViewModal'));
 const EditTaskModal = lazy(() => import('./EditTaskModal'));
+const ConfirmDeleteModal = lazy(() => import('./ConfirmDeleteModal'));
 
 // Fallback mientras se descarga un chunk diferido
 function ModalLoading() {
@@ -29,8 +31,9 @@ function ModalLoading() {
   );
 }
 
-export default function Board() {
-  const { user, logout } = useKanbanStore();
+export default function Board({ isDark, onToggleTheme }) {
+  const user = useKanbanStore((s) => s.user);
+  const logout = useKanbanStore((s) => s.logout);
   const tasks = useKanbanStore((s) => s.tasks);
   const archivedTasks = useKanbanStore((s) => s.archivedTasks);
   const setTasks = useKanbanStore((s) => s.setTasks);
@@ -50,6 +53,7 @@ export default function Board() {
   const [showGoodbye, setShowGoodbye] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [completingTask, setCompletingTask] = useState(null);
+  const [deletingTask, setDeletingTask] = useState(null);
   const [viewingImageIndex, setViewingImageIndex] = useState(null);
   const menuRef = useRef(null);
   const scrollRef = useRef(null);
@@ -59,7 +63,14 @@ export default function Board() {
   const [tasksLoading, setTasksLoading] = useState(!tasksLoaded);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const columns = getColumns();
+  // getColumns() agrupa y ordena: memoizarlo evita recalcular en cada render.
+  // Lee el estado actual del store vía get(); `tasks` en la llamada solo
+  // declara la dependencia real (recalcular cuando cambian las tareas).
+  // La columna ARCHIVED (Terminado) se muestra en el tablero pero vacía: las
+  // tareas terminadas se archivan y viven en archivedTasks (historial), no en
+  // la columna. El drag/botón a Terminado abre el modal de finalización y al
+  // confirmar la tarea sale del tablero y queda solo en el historial.
+  const columns = useMemo(() => getColumns(tasks), [getColumns, tasks]);
 
   // Medir la altura de la columna TODO para que las demás columnas la igualen
   useEffect(() => {
@@ -240,12 +251,7 @@ export default function Board() {
   // ─── Handlers ─────────────────────────────────
   const handleEditTask = (task) => {
     // Detectar si el usuario actual es un usuario compartido (solo puede ver y togglear subtareas)
-    const isSharedUser = user &&
-      task.creator?.id !== user.id &&
-      task.assignee?.id !== user.id &&
-      task.shares?.some((s) => s.user?.id === user.id || s.userId === user.id);
-
-    if (isSharedUser) {
+    if (isSharedUserForTask(task)) {
       const color = getUserColor(user.id);
       setViewingTask({ ...task, _sharedView: true, _userColor: color });
     } else {
@@ -292,6 +298,17 @@ export default function Board() {
     });
   };
 
+  const handleDeleteTask = async (task) => {
+    try {
+      await tasksApi.remove(task.id);
+      removeTask(task.id);
+      setDeletingTask(null);
+    } catch (err) {
+      logger.error('Error al eliminar tarea', err, { taskId: task.id, taskTitle: task.title });
+      setDeletingTask(null);
+    }
+  };
+
   const handleLogout = () => {
     setShowGoodbye(true);
   };
@@ -307,13 +324,13 @@ export default function Board() {
   }, [showGoodbye, logout]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
+    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-950">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between shadow-sm">
+      <header className="bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800 px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3">
           <TreeLogo className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
-          <h1 className="hidden sm:block text-lg font-bold text-gray-900">Treeverde</h1>
-          <span className="hidden sm:inline-block text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+          <h1 className="hidden sm:block text-lg font-bold text-gray-900 dark:text-gray-100">Treeverde</h1>
+          <span className="hidden sm:inline-block text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
             {showHistory ? 'Historial' : 'Tablero'}
           </span>
 
@@ -350,56 +367,45 @@ export default function Board() {
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
           {user && <NotificationPanel />}
+          <ThemeToggle isDark={isDark} onToggle={onToggleTheme} />
           {user && (
             <div className="relative" ref={menuRef}>
               <button
                 data-testid="user-menu-button"
                 onClick={() => setShowUserMenu((v) => !v)}
-                className="flex items-center gap-1 sm:gap-3 pr-2 sm:pr-3 border-r border-gray-200 cursor-pointer hover:opacity-80 transition"
+                className="flex items-center gap-1 sm:gap-3 pr-2 sm:pr-3 border-r border-gray-200 dark:border-gray-700 cursor-pointer hover:opacity-80 transition"
               >
                 <div className="relative">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-bold overflow-hidden bg-emerald-500">
-                    {user.profileImage ? (
-                      <img src={getCloudinaryThumb(user.profileImage, 96)} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    ) : (
-                      user.name.charAt(0).toUpperCase()
-                    )}
-                  </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-400 border-2 border-white rounded-full" />
+                  <Avatar user={user} sizeClass="w-7 h-7 sm:w-8 sm:h-8 text-xs sm:text-sm" fallbackClass="bg-emerald-500 text-white" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-400 border-2 border-white dark:border-gray-900 rounded-full" />
                 </div>
                 <div className="hidden sm:flex flex-col items-start">
-                  <span data-testid="user-menu-name" className="text-sm font-semibold text-gray-900 leading-tight">{user.name}</span>
-                  <span className="text-[11px] text-gray-400 leading-tight">{user.email}</span>
+                  <span data-testid="user-menu-name" className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight">{user.name}</span>
+                  <span className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight">{user.email}</span>
                 </div>
               </button>
 
               {/* Dropdown */}
               {showUserMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 sm:w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 animate-fade-scale-in z-50">
-                  <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden shrink-0">
-                      {user.profileImage ? (
-                        <img src={getCloudinaryThumb(user.profileImage, 96)} alt="" className="w-full h-full object-cover" loading="lazy" />
-                      ) : (
-                        user.name.charAt(0).toUpperCase()
-                      )}
-                    </div>
+                <div className="absolute right-0 top-full mt-2 w-48 sm:w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 animate-fade-scale-in z-50">
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                    <Avatar user={user} sizeClass="w-9 h-9 text-sm" fallbackClass="bg-emerald-500 text-white" />
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{user.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
                     </div>
                   </div>
                   <div className="py-1">
                     <button
                       data-testid="edit-profile-button" onClick={() => { setShowUserMenu(false); setShowEditProfile(true); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition font-medium"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition font-medium"
                     >
                       <span className="text-base">⚙️</span>
                       Editar perfil
                     </button>
                     <button
                       data-testid="logout-button" onClick={() => { setShowUserMenu(false); handleLogout(); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition font-medium"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition font-medium"
                     >
                       <span className="text-base">🚪</span>
                       Cerrar sesión
@@ -415,7 +421,7 @@ export default function Board() {
             onClick={() => setShowHistory((v) => !v)}
             className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition shadow-sm ${
               showHistory
-                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white'
             }`}
           >
@@ -445,11 +451,11 @@ export default function Board() {
             <TreeSpinner size="xl" />
             {/* Texto */}
             <div className="text-center">
-              <p className="text-sm font-semibold text-gray-700">Cargando tareas</p>
-              <p className="text-xs text-gray-400 mt-1">Obteniendo tus tareas del servidor...</p>
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Cargando tareas</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Obteniendo tus tareas del servidor...</p>
             </div>
             {/* Barra de progreso indeterminada */}
-            <div className="w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="w-48 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div className="h-full bg-emerald-500 rounded-full animate-loading-bar" style={{ width: '40%' }} />
             </div>
           </div>
@@ -462,11 +468,11 @@ export default function Board() {
         </Suspense>
       ) : tasks.length === 0 && archivedTasks.length === 0 && !tasksHasMore ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4">
+          <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 flex items-center justify-center mb-4">
             <TreeLogo className="w-11 h-11 sm:w-14 sm:h-14 text-emerald-500" />
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">No hay tareas visibles</h2>
-          <p className="text-sm text-gray-500 max-w-md mb-6">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">No hay tareas visibles</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-6">
             Aún no tienes tareas creadas, asignadas o compartidas contigo.
             ¡Crea tu primera tarea para empezar!
           </p>
@@ -493,6 +499,8 @@ export default function Board() {
                   onEditTask={handleEditTask}
                   onMoveTask={handleMoveTask}
                   onViewImage={handleViewImage}
+                  onDeleteTask={setDeletingTask}
+                  canDeleteForTask={(task) => user?.id === task.creator?.id}
                   fixedHeight={column.id !== 'TODO' ? referenceHeight : undefined}
                   todoRef={column.id === 'TODO' ? todoColumnRef : undefined}
                   isSharedUserForTask={isSharedUserForTask}
@@ -508,7 +516,7 @@ export default function Board() {
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${
                     i === activeColumn
                       ? 'bg-emerald-500 w-3'
-                      : 'bg-gray-300 hover:bg-gray-400'
+                      : 'bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600'
                   }`}
                   aria-label={`Ir a ${col.title}`}
                 />
@@ -523,7 +531,7 @@ export default function Board() {
               <button
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="px-5 py-2.5 bg-white border border-gray-200 text-sm font-semibold text-emerald-700 rounded-xl shadow-sm hover:bg-emerald-50 hover:border-emerald-200 transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-emerald-700 dark:text-emerald-400 rounded-xl shadow-sm hover:bg-emerald-50 dark:hover:bg-gray-700 hover:border-emerald-200 dark:hover:border-emerald-900 transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {loadingMore ? (
                   <>
@@ -560,6 +568,16 @@ export default function Board() {
           ) : (
             <EditTaskModal task={viewingTask} onClose={() => setViewingTask(null)} readOnly />
           )}
+        </Suspense>
+      )}
+
+      {deletingTask && (
+        <Suspense fallback={<ModalLoading />}>
+          <ConfirmDeleteModal
+            task={deletingTask}
+            onConfirm={() => handleDeleteTask(deletingTask)}
+            onCancel={() => setDeletingTask(null)}
+          />
         </Suspense>
       )}
 

@@ -1,25 +1,20 @@
-import { useEffect } from 'react';
 import useKanbanStore from '../store/kanbanStore';
 import { authApi } from '../services/api';
 import { broadcastLogin } from '../services/sessionSync';
 
+// Hook de autenticación usado por LoginForm y RegisterForm.
+// Nota: la restauración de sesión (GET /me + tareas) NO vive aquí: la hace
+// App.jsx en paralelo cuando hay token guardado y el usuario aún no está
+// cargado (estos formularios solo se renderizan sin sesión, así que el
+// efecto de restauración nunca se ejecutaría aquí).
 export default function useAuth() {
-  const { user, token, loading, setUser, logout, setLoading, setError, setShowWelcome } = useKanbanStore();
-
-  useEffect(() => {
-    if (token && !user) {
-      setLoading(true);
-      authApi
-        .me()
-        .then((u) => setUser(u, token, u.supabaseToken))
-        .catch(() => logout())
-        .finally(() => setLoading(false));
-    }
-  }, [token, user, setUser, logout, setLoading]);
+  const loading = useKanbanStore((s) => s.loading);
+  const setUser = useKanbanStore((s) => s.setUser);
+  const setLoading = useKanbanStore((s) => s.setLoading);
+  const setShowWelcome = useKanbanStore((s) => s.setShowWelcome);
 
   const login = async (email, password) => {
     setLoading(true);
-    setError(null);
     try {
       const data = await authApi.login(email, password);
       setUser(data.user, data.token, data.supabaseToken);
@@ -27,9 +22,6 @@ export default function useAuth() {
       broadcastLogin(data.token);
       setShowWelcome(true);
       return data.user;
-    } catch (err) {
-      setError(err.message);
-      throw err;
     } finally {
       setLoading(false);
     }
@@ -37,21 +29,16 @@ export default function useAuth() {
 
   const register = async (name, email, password) => {
     setLoading(true);
-    setError(null);
     try {
       const data = await authApi.register(name, email, password);
       setUser(data.user, data.token, data.supabaseToken);
       broadcastLogin(data.token);
       setShowWelcome(true);
       return data.user;
-    } catch (err) {
-      setError(err.message);
-      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  return { user, token, loading, isAuthenticated: !!token, login, register, logout };
+  return { login, register, loading };
 }
-

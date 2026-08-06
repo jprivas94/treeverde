@@ -28,6 +28,7 @@
 - **Compartir tareas** con otros usuarios (con notificaciones)
 - **Invitar por enlace**: al crear una tarea se genera una URL que lleva a quien la abre al registro y lo agrega como **asignado** (o como **compartido** desde la edición); también funciona para usuarios ya registrados
 - **Edición con clic**: Toda la tarjeta es clickeable para editar
+- **Permisos de edición**: el asignado (que no es el creador) puede editar el contenido, pero **no** puede modificar a quién está asignada la tarea, la fecha límite ni la prioridad — eso solo lo puede cambiar el creador
 
 ### ⚡ Rendimiento
 - **Carga inicial paralela** de `/auth/me` + `/tasks` con **skeleton del tablero** (sin pantalla de carga bloqueante)
@@ -79,7 +80,7 @@ treeverde/
 │   │   ├── utils/     # config.js (JWT_SECRET/CORS), permisos, notificaciones
 │   │   └── index.js   # Entry point
 │   ├── prisma/        # Schema y migraciones (PostgreSQL + índices)
-│   ├── tests/         # 106 tests (Supertest + unitarios)
+│   ├── tests/         # 122 tests (Supertest + unitarios)
 │   ├── .gitignore
 │   └── package.json
 │
@@ -280,7 +281,7 @@ carol@test.com / 123456 (Carol)
 | `npm run db:migrate` | Migraciones Prisma |
 | `npm run db:seed` | Datos de prueba |
 | `npm run db:generate` | Regenerar Prisma Client |
-| `npm test` | 106 tests (Supertest + unitarios, incluye módulo de email) |
+| `npm test` | 122 tests (Supertest + unitarios, incluye módulo de email) |
 | `npm run lint` | ESLint |
 
 ### Frontend
@@ -289,7 +290,7 @@ carol@test.com / 123456 (Carol)
 | `npm run dev` | Dev server con HMR |
 | `npm run build` | Build producción |
 | `npm run preview` | Preview del build |
-| `npm test` | 66 tests con `node:test` |
+| `npm test` | 78 tests con `node:test` + 85 de componentes (`test:components`, jsdom + Testing Library) |
 | `npm run test:e2e` | 3 tests e2e reales con Playwright (sincronización de sesión entre pestañas por BroadcastChannel: login/logout, perfil y leídas) |
 | `npm run lint` | ESLint |
 

@@ -27,8 +27,19 @@ function createFakeDb() {
     _notifications: notifications,
     reset() { users = []; tasks = []; shares = []; notifications.length = 0; uid = 0; tid = 0; sid = 0; nid = 0; },
     user: {
-      async findMany({ select, orderBy, take, skip } = {}) {
+      async findMany({ where, select, orderBy, take, skip } = {}) {
         let result = [...users];
+        if (where?.name?.contains) {
+          const insensitive = where.name.mode === 'insensitive';
+          const needle = insensitive ? where.name.contains.toLowerCase() : where.name.contains;
+          result = result.filter((u) => {
+            const hay = insensitive ? u.name.toLowerCase() : u.name;
+            return hay.includes(needle);
+          });
+        }
+        if (where?.id?.in) {
+          result = result.filter((u) => where.id.in.includes(u.id));
+        }
         if (orderBy?.name === 'asc') {
           result.sort((a, b) => a.name.localeCompare(b.name));
         }
@@ -346,6 +357,54 @@ test('PUT /api/tasks/:id → 403 si no es creador ni asignado', async () => {
     .set('Authorization', `Bearer ${other.body.token}`)
     .send({ title: 'Hack' });
   assert.equal(res.status, 403);
+});
+
+test('PUT /api/tasks/:id → el asignado (no creador) no puede reasignar ni cambiar la fecha', async () => {
+  const creator = await register('Crea Lock', 'crealock@test.com');
+  const assignee = await register('Asig Lock', 'asiglock@test.com');
+  const created = await createTask(creator.body.token, {
+    assigneeId: assignee.body.user.id,
+    dueDate: '2026-01-01',
+    priority: 'HIGH'
+  });
+
+  const other = await register('Otro Lock', 'otrolock@test.com');
+  const res = await api.put(`/api/tasks/${created.body.id}`)
+    .set('Authorization', `Bearer ${assignee.body.token}`)
+    .send({ assigneeId: other.body.user.id, dueDate: '2030-12-31', priority: 'CRITICAL', title: 'Título editado por asignado' });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.title, 'Título editado por asignado', 'el asignado sí puede editar otros campos');
+  assert.equal(res.body.assigneeId, assignee.body.user.id, 'el asignado no puede reasignar');
+  assert.equal(new Date(res.body.dueDate).toISOString().slice(0, 10), '2026-01-01', 'el asignado no puede cambiar la fecha');
+  assert.equal(res.body.priority, 'HIGH', 'el asignado no puede cambiar la prioridad');
+});
+
+test('PUT /api/tasks/:id → el asignado (no creador) no puede desasignarse', async () => {
+  const creator = await register('Crea Lock2', 'crealock2@test.com');
+  const assignee = await register('Asig Lock2', 'asiglock2@test.com');
+  const created = await createTask(creator.body.token, { assigneeId: assignee.body.user.id });
+
+  const res = await api.put(`/api/tasks/${created.body.id}`)
+    .set('Authorization', `Bearer ${assignee.body.token}`)
+    .send({ assigneeId: null });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.assigneeId, assignee.body.user.id, 'el asignado no puede desasignarse');
+});
+
+test('PUT /api/tasks/:id → el creador sigue pudiendo reasignar y cambiar la fecha', async () => {
+  const creator = await register('Crea Still', 'creastill@test.com');
+  const assignee = await register('Asig Still', 'asigstill@test.com');
+  const created = await createTask(creator.body.token, { assigneeId: assignee.body.user.id });
+
+  const res = await api.put(`/api/tasks/${created.body.id}`)
+    .set('Authorization', `Bearer ${creator.body.token}`)
+    .send({ assigneeId: null, dueDate: '2027-05-05' });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.assigneeId, null, 'el creador sí puede desasignar');
+  assert.equal(new Date(res.body.dueDate).toISOString().slice(0, 10), '2027-05-05', 'el creador sí puede cambiar la fecha');
 });
 
 // ═══════════════ SUBTAREAS ═══════════════
@@ -870,6 +929,64 @@ test('GET /api/users → limit mayor a 500 se recorta a 500 (y no rompe)', async
   assert.equal(res.body.length, 2);
 });
 
+test('GET /api/users → 200 con búsqueda ?search= (case-insensitive)', async () => {
+  await register('Ana Test', 'busca1@test.com');
+  await register('Beto Test', 'busca2@test.com');
+  const reg = await register('Buscador', 'buscador@test.com');
+
+  const res = await api.get('/api/users?search=ana').set('Authorization', `Bearer ${reg.body.token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.length, 1);
+  assert.equal(res.body[0].name, 'Ana Test');
+
+  const res2 = await api.get('/api/users?search=BETO').set('Authorization', `Bearer ${reg.body.token}`);
+  assert.equal(res2.status, 200);
+  assert.equal(res2.body.length, 1);
+  assert.equal(res2.body[0].name, 'Beto Test');
+});
+
+test('GET /api/users → search vacío o ausente devuelve todos', async () => {
+  await register('Ana V', 'anav@test.com');
+  await register('Beto V', 'betov@test.com');
+  const reg = await register('Buscador V', 'buscadorv@test.com');
+
+  const res = await api.get('/api/users?search=').set('Authorization', `Bearer ${reg.body.token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.length, 3);
+});
+
+test('POST /api/tasks → 400 con prioridad inválida (validación de payload)', async () => {
+  const reg = await register('Val Prior', 'valprior@test.com');
+  const res = await createTask(reg.body.token, { priority: 'IMPOSSIBLE' });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/tasks → 400 con subtareas inválidas (validación de payload)', async () => {
+  const reg = await register('Val Sub', 'valsub@test.com');
+  const res = await createTask(reg.body.token, { subtasks: [{ id: 's1', title: '', completed: 'si' }] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/tasks → 400 con fecha límite inválida (validación de payload)', async () => {
+  const reg = await register('Val Date', 'valdate@test.com');
+  const res = await createTask(reg.body.token, { dueDate: 'no-es-una-fecha' });
+  assert.equal(res.status, 400);
+});
+
+test('PUT /api/tasks/:id → 400 con prioridad inválida (validación de payload)', async () => {
+  const reg = await register('Val Put', 'valput@test.com');
+  const created = await createTask(reg.body.token);
+  const res = await api.put(`/api/tasks/${created.body.id}`)
+    .set('Authorization', `Bearer ${reg.body.token}`)
+    .send({ priority: 'ULTRA' });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/auth/register → 400 con email inválido', async () => {
+  const res = await register('Email Malo', 'no-es-un-email');
+  assert.equal(res.status, 400);
+});
+
 test('GET /api/users → 401 sin token', async () => {
   const res = await api.get('/api/users');
   assert.equal(res.status, 401);
@@ -946,6 +1063,29 @@ test('POST /api/tasks/:id/invite → rol por defecto es share (edición)', async
   const res = await api.post(`/api/tasks/${created.body.id}/invite`)
     .set('Authorization', `Bearer ${reg.body.token}`)
     .send({});
+  assert.equal(res.status, 200);
+  assert.equal(res.body.inviteRole, 'share');
+});
+
+test('POST /api/tasks/:id/invite → 403 si el asignado intenta generar enlace rol assignee', async () => {
+  const creator = await register('Inv Lock C', 'invlockc@test.com');
+  const assignee = await register('Inv Lock A', 'invlocka@test.com');
+  const created = await createTask(creator.body.token, { assigneeId: assignee.body.user.id });
+
+  const res = await api.post(`/api/tasks/${created.body.id}/invite`)
+    .set('Authorization', `Bearer ${assignee.body.token}`)
+    .send({ role: 'assignee' });
+  assert.equal(res.status, 403);
+});
+
+test('POST /api/tasks/:id/invite → 200 si el asignado genera enlace rol share', async () => {
+  const creator = await register('Inv Share C', 'invsharec@test.com');
+  const assignee = await register('Inv Share A', 'invsharea@test.com');
+  const created = await createTask(creator.body.token, { assigneeId: assignee.body.user.id });
+
+  const res = await api.post(`/api/tasks/${created.body.id}/invite`)
+    .set('Authorization', `Bearer ${assignee.body.token}`)
+    .send({ role: 'share' });
   assert.equal(res.status, 200);
   assert.equal(res.body.inviteRole, 'share');
 });

@@ -26,7 +26,9 @@ const logger = {
       existing.push(entry);
       if (existing.length > 20) existing.splice(0, existing.length - 20);
       localStorage.setItem(logKey, JSON.stringify(existing));
-    } catch {}
+    } catch {
+      /* localStorage no disponible (p. ej. modo privado): no bloquea el log */
+    }
   },
 };
 

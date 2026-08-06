@@ -10,7 +10,11 @@ import jwt from 'jsonwebtoken';
 // para que los tests puedan setear/limpiar process.env después del import,
 // siguiendo el mismo patrón de getJwtSecret() en config.js.
 
-/** ¿Está configurado el JWT de Supabase? (sin él, realtime no puede autenticarse) */
+/**
+ * ¿Está configurado el JWT de Supabase? (sin él, realtime no puede autenticarse)
+ * API pública: se usa principalmente en los tests (supabaseToken.test.js) para
+ * verificar la degradación elegante cuando no hay SUPABASE_JWT_SECRET.
+ */
 export function isSupabaseRealtimeConfigured() {
   return Boolean(process.env.SUPABASE_JWT_SECRET);
 }

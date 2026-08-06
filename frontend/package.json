@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --test src/constants/kanbanConfig.test.js src/store/kanbanStore.test.js src/utils/images.test.js src/services/api.test.js src/services/realtime.test.js src/services/sessionSync.test.js src/services/sessionSync.e2e.test.js",
+    "test": "node --test src/constants/kanbanConfig.test.js src/store/kanbanStore.test.js src/utils/images.test.js src/utils/date.test.js src/utils/tasks.test.js src/services/api.test.js src/services/realtime.test.js src/services/sessionSync.test.js src/services/sessionSync.e2e.test.js",
+    "test:components": "node --experimental-test-module-mocks --import tsx --test src/components/*.test.jsx",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
@@ -24,14 +25,18 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^6.0.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.7.0",
+    "jsdom": "^30.0.1",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
+    "tsx": "^4.23.8",
     "vite": "^8.0.0"
   }
 }

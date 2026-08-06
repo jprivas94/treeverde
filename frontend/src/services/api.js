@@ -163,7 +163,13 @@ export const invitesApi = {
 
 // ─── Users ─────────────────────────────────────
 export const usersApi = {
-  getAll: () => request('/users')
+  // ?search=nombre (parcial, case-insensitive) + paginación opcional
+  getAll: (params) => {
+    const qs = params
+      ? `?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined)).toString()}`
+      : '';
+    return request(`/users${qs}`);
+  }
 };
 
 // ─── Notifications ────────────────────────────

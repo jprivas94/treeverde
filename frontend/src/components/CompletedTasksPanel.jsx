@@ -1,17 +1,8 @@
 import { useState, useMemo } from 'react';
 import ImageViewModal from './ImageViewModal';
-
-function formatDate(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return null;
-  return d;
-}
-
-function fmt(d) {
-  if (!d) return '—';
-  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
-}
+import { PRIORITY_CONFIG } from '../constants/kanbanConfig';
+import { parseDate, formatDateFull } from '../utils/date';
+import Avatar from './Avatar';
 
 function daysDiff(d1, d2) {
   const diff = d2.getTime() - d1.getTime();
@@ -19,8 +10,8 @@ function daysDiff(d1, d2) {
 }
 
 function getTaskStatus(task) {
-  const due = formatDate(task.dueDate);
-  const completed = formatDate(task.completedAt || task.archivedAt || task.updatedAt);
+  const due = parseDate(task.dueDate);
+  const completed = parseDate(task.completedAt || task.archivedAt || task.updatedAt);
   if (!completed || !due) return null;
 
   const diff = daysDiff(due, completed);
@@ -29,35 +20,28 @@ function getTaskStatus(task) {
     return {
       label: early <= 1 ? 'Anticipado' : `${early} días antes`,
       badge: 'Anticipado',
-      badgeColor: 'bg-emerald-100 text-emerald-700',
-      rowColor: 'bg-emerald-50/50 hover:bg-emerald-50',
+      badgeColor: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+      rowColor: 'bg-emerald-50/50 hover:bg-emerald-50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50',
       diff: diff
     };
   } else if (diff === 0) {
     return {
       label: 'Justo a tiempo',
       badge: 'A tiempo',
-      badgeColor: 'bg-blue-100 text-blue-700',
-      rowColor: 'bg-blue-50/30 hover:bg-blue-50',
+      badgeColor: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+      rowColor: 'bg-blue-50/30 hover:bg-blue-50 dark:bg-blue-950/30 dark:hover:bg-blue-950/50',
       diff: 0
     };
   } else {
     return {
       label: `${diff} día${diff !== 1 ? 's' : ''} después`,
       badge: 'Vencido',
-      badgeColor: 'bg-red-100 text-red-700',
-      rowColor: 'bg-red-50/30 hover:bg-red-50',
+      badgeColor: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+      rowColor: 'bg-red-50/30 hover:bg-red-50 dark:bg-red-950/30 dark:hover:bg-red-950/50',
       diff: diff
     };
   }
 }
-
-const priorityConfig = {
-  LOW: { label: 'Baja', class: 'text-green-600 bg-green-100' },
-  MEDIUM: { label: 'Media', class: 'text-amber-600 bg-amber-100' },
-  HIGH: { label: 'Alta', class: 'text-orange-600 bg-orange-100' },
-  CRITICAL: { label: 'Crítica', class: 'text-red-600 bg-red-100' },
-};
 
 const ITEMS_PER_PAGE = 5;
 
@@ -174,11 +158,11 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
 
   if (totalCompleted === 0) {
     return (
-      <div className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-6">
+      <div className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 p-4 sm:p-6">
         <div className="max-w-6xl mx-auto text-center py-10 sm:py-16">
           <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">📊</div>
-          <h2 className="text-base sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">Historial de Tareas</h2>
-          <p className="text-xs sm:text-sm text-gray-500">
+          <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1 sm:mb-2">Historial de Tareas</h2>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             {search ? 'No se encontraron tareas con ese criterio.' : 'No hay tareas completadas aun.'}
           </p>
         </div>
@@ -186,13 +170,13 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
     );
   }
 
-  return (      <div className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 p-3 sm:p-6">
+  return (      <div className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 p-3 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base sm:text-xl font-bold text-gray-900">📊 Historial</h2>
-            <p className="text-[11px] sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
+            <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-gray-100">📊 Historial</h2>
+            <p className="text-[11px] sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">
               {totalCompleted} tarea{totalCompleted !== 1 ? 's' : ''} completada{totalCompleted !== 1 ? 's' : ''}
             </p>
           </div>
@@ -200,18 +184,18 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
 
         {/* Buscador */}
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">{'\u{1F50D}'}</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500">{'\u{1F50D}'}</span>
           <input
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); resetPage(); }}
             placeholder="Buscar por titulo, creador, etiquetas..."
-            className="w-full pl-8 pr-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
+            className="w-full pl-8 pr-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white dark:bg-gray-800 dark:text-gray-100"
           />
           {search && (
             <button
               onClick={() => { setSearch(''); resetPage(); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 hover:text-gray-600"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             >
               &times;
             </button>
@@ -221,12 +205,12 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
         {/* Filtros */}
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {/* Prioridad */}
-          <div className="flex items-center gap-1 text-xs text-gray-500">
+          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
             <span>{'\u{1F7E2}'}</span>
             <select
               value={priorityFilter}
               onChange={(e) => { setPriorityFilter(e.target.value); resetPage(); }}
-              className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-[11px] sm:text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none max-w-[100px] sm:max-w-none"
+              className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-[11px] sm:text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none max-w-[100px] sm:max-w-none"
             >
               {PRIORITY_FILTERS.map((f) => (
                 <option key={f.value} value={f.value} className={f.cls || ''}>
@@ -237,12 +221,12 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
           </div>
 
           {/* Estado */}
-          <div className="flex items-center gap-1 text-xs text-gray-500">
+          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
             <span>{'\u{1F3C6}'}</span>
             <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }}
-              className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-[11px] sm:text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none max-w-[100px] sm:max-w-none"
+              className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-[11px] sm:text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none max-w-[100px] sm:max-w-none"
             >
               {STATUS_FILTERS.map((f) => (
                 <option key={f.value} value={f.value}>{f.label}</option>
@@ -251,12 +235,12 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
           </div>
 
           {/* Orden */}
-          <div className="flex items-center gap-1 text-xs text-gray-500">
+          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
             <span>{'\u{1F4C5}'}</span>
             <select
               value={sortOrder}
               onChange={(e) => { setSortOrder(e.target.value); resetPage(); }}
-              className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-[11px] sm:text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-[11px] sm:text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
             >
               <option value="newest">Mas reciente</option>
               <option value="oldest">Mas antiguo</option>
@@ -267,7 +251,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
           {(priorityFilter || statusFilter) && (
             <button
               onClick={() => { setPriorityFilter(''); setStatusFilter(''); setSortOrder('newest'); resetPage(); }}
-              className="text-[11px] font-medium text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition"
+              className="text-[11px] font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition"
             >
               {'\u2716'} Limpiar
             </button>
@@ -275,26 +259,26 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
         </div>
 
         {/* Tabla de completadas */}
-        <div className="rounded-xl border border-emerald-200 bg-white shadow-sm overflow-hidden">
-          <div className="px-3 sm:px-5 py-1.5 sm:py-2 bg-gradient-to-r from-emerald-50 to-white flex items-center gap-1.5 sm:gap-2 border-b border-emerald-100">
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+          <div className="px-3 sm:px-5 py-1.5 sm:py-2 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-950/40 dark:to-gray-900 flex items-center gap-1.5 sm:gap-2 border-b border-emerald-100 dark:border-emerald-900">
             <span className="text-[11px] sm:text-sm">✅</span>
-            <span className="text-[10px] sm:text-xs font-bold text-gray-600 uppercase tracking-wide">Completadas</span>
-            <span className="ml-auto text-[10px] sm:text-[11px] font-semibold text-gray-400">
+            <span className="text-[10px] sm:text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Completadas</span>
+            <span className="ml-auto text-[10px] sm:text-[11px] font-semibold text-gray-400 dark:text-gray-500">
               {startIdx + 1}-{Math.min(startIdx + ITEMS_PER_PAGE, totalCompleted)} de {totalCompleted}
             </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-gray-100 bg-gray-50/50"><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tarea</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Creador</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Asignado</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Prioridad</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Fecha limite</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Completado</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Estado</th><th className="text-right px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Diferencia</th></tr></thead>
-              <tbody className="divide-y divide-gray-50">
+              <thead><tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50"><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tarea</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Creador</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Asignado</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">Prioridad</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">Fecha limite</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">Completado</th><th className="text-left px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th><th className="text-right px-3 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Diferencia</th></tr></thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {pageItems.map((task) => {
                   const info = getTaskStatus(task);
-                  const priority = priorityConfig[task.priority] || priorityConfig.MEDIUM;
-                  const due = formatDate(task.dueDate);
-                  const completed = formatDate(task.completedAt || task.archivedAt || task.updatedAt);
+                  const priority = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.MEDIUM;
+                  const due = parseDate(task.dueDate);
+                  const completed = parseDate(task.completedAt || task.archivedAt || task.updatedAt);
 
                   return (
-                    <tr key={task.id} onClick={() => onEditTask?.(task)} className={`transition cursor-pointer ${info ? info.rowColor : 'hover:bg-gray-50'}`}><td className="px-3 sm:px-5 py-2.5 sm:py-3">
+                    <tr key={task.id} onClick={() => onEditTask?.(task)} className={`transition cursor-pointer ${info ? info.rowColor : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}><td className="px-3 sm:px-5 py-2.5 sm:py-3">
                         <div className="flex items-center gap-1.5 sm:gap-2">
                           <div className={`w-1 h-1.5 sm:w-1.5 sm:h-1.5 rounded-full flex-shrink-0 ${
                             task.priority === 'CRITICAL' ? 'bg-red-400' :
@@ -303,7 +287,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
                           }`} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs sm:text-sm font-medium text-gray-900">{task.title}</span>
+                              <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100">{task.title}</span>
                               {(() => {
                                 const imgs = Array.isArray(task.images) ? task.images.filter(Boolean) : [];
                                 if (imgs.length === 0) return null;
@@ -316,7 +300,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
                                       );
                                       if (idx !== -1) setViewingImageIndex(idx);
                                     }}
-                                    className="shrink-0 text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded transition"
+                                    className="shrink-0 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 px-1.5 py-0.5 rounded transition"
                                     title="Ver imagen"
                                   >
                                     👁️ {imgs.length > 1 ? `${imgs.length} imágenes` : 'Ver imagen'}
@@ -325,33 +309,37 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
                               })()}
                             </div>
                             {task.description && (
-                              <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 line-clamp-1">{task.description}</p>
+                              <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 mt-0.5 line-clamp-1">{task.description}</p>
                             )}
                           </div>
                         </div>
                       </td>
                       <td className="px-3 sm:px-5 py-2.5 sm:py-3 hidden sm:table-cell">
                         {task.creator ? (
-                          <span className="text-[11px] sm:text-xs text-gray-500 flex items-center gap-1">
-                            <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-indigo-100 flex items-center justify-center text-[7px] sm:text-[8px] font-bold text-indigo-600">
-                              {task.creator.name.charAt(0).toUpperCase()}
-                            </span>
+                          <span className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            <Avatar
+                              user={task.creator}
+                              sizeClass="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[7px] sm:text-[8px]"
+                              fallbackClass="bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300"
+                            />
                             {task.creator.name}
                           </span>
                         ) : (
-                          <span className="text-[11px] sm:text-xs text-gray-400">—</span>
+                          <span className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500">—</span>
                         )}
                       </td>
                       <td className="px-3 sm:px-5 py-2.5 sm:py-3 hidden sm:table-cell">
                         {task.assignee ? (
-                          <span className="text-[11px] sm:text-xs text-gray-500 flex items-center gap-1">
-                            <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-emerald-100 flex items-center justify-center text-[7px] sm:text-[8px] font-bold text-emerald-600">
-                              {task.assignee.name.charAt(0).toUpperCase()}
-                            </span>
+                          <span className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            <Avatar
+                              user={task.assignee}
+                              sizeClass="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[7px] sm:text-[8px]"
+                              fallbackClass="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-300"
+                            />
                             {task.assignee.name}
                           </span>
                         ) : (
-                          <span className="text-[11px] sm:text-xs text-gray-400">—</span>
+                          <span className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500">—</span>
                         )}
                       </td>
                       <td className="px-3 sm:px-5 py-2.5 sm:py-3 hidden md:table-cell">
@@ -360,10 +348,10 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
                         </span>
                       </td>
                       <td className="px-3 sm:px-5 py-2.5 sm:py-3 hidden lg:table-cell">
-                        <span className="text-[11px] sm:text-sm text-gray-600">{due ? fmt(due) : '—'}</span>
+                        <span className="text-[11px] sm:text-sm text-gray-600 dark:text-gray-400">{formatDateFull(due) || '—'}</span>
                       </td>
                       <td className="px-3 sm:px-5 py-2.5 sm:py-3 hidden lg:table-cell">
-                        <span className="text-[11px] sm:text-sm text-gray-600">{completed ? fmt(completed) : '—'}</span>
+                        <span className="text-[11px] sm:text-sm text-gray-600 dark:text-gray-400">{formatDateFull(completed) || '—'}</span>
                       </td>
                       <td className="px-3 sm:px-5 py-2.5 sm:py-3">
                         {info ? (
@@ -371,7 +359,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
                             {info.badge}
                           </span>
                         ) : (
-                          <span className="text-[10px] sm:text-[11px] text-gray-400">—</span>
+                          <span className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500">—</span>
                         )}
                       </td>
                       <td className="px-3 sm:px-5 py-2.5 sm:py-3 text-right hidden sm:table-cell">{info ? (<span className={`text-[11px] sm:text-xs font-semibold ${info.diff < 0 ? 'text-emerald-600' : info.diff === 0 ? 'text-blue-600' : 'text-red-500'}`}>{info.label}</span>) : (<span className="text-[11px] sm:text-xs text-gray-400">—</span>)}</td></tr>
@@ -385,7 +373,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
         {/* Paginador */}
         <div className="flex flex-col items-center gap-2 pb-4">
           {/* Indicador de página */}
-          <div className="text-xs text-gray-500 font-medium">
+          <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">
             Página {safePage} de {totalPages}
           </div>
           <div className="flex items-center gap-1.5">
@@ -393,7 +381,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage <= 1}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-sm"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-sm"
             >
               {'\u2190'} Anterior
             </button>
@@ -412,7 +400,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
                 if (!show) {
                   if (isEllipsisPrev || isEllipsisNext) {
                     return (
-                      <span key={num} className="px-1 py-1 text-xs text-gray-400 select-none">...</span>
+                      <span key={num} className="px-1 py-1 text-xs text-gray-400 dark:text-gray-500 select-none">...</span>
                     );
                   }
                   return null;
@@ -425,7 +413,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
                     className={`min-w-[32px] h-8 text-xs font-bold rounded-lg transition shadow-sm ${
                       isCurrent
                         ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 hover:border-gray-400'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500'
                     }`}
                   >
                     {num}
@@ -438,7 +426,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage >= totalPages}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-sm"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-sm"
             >
               Siguiente {'\u2192'}
             </button>

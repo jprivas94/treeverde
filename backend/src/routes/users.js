@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../db.js';
 import authenticate from '../middleware/auth.js';
 import logger from '../utils/logger.js';
+import { parsePagination } from '../utils/pagination.js';
 
 const router = Router();
 
@@ -12,10 +13,12 @@ router.use(authenticate);
 // Paginación opcional: ?limit=50&offset=0 (máx 500 por página; sin limit = todos)
 router.get('/', async (req, res) => {
   try {
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 0, 0), 500);
-    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const { limit, offset } = parsePagination(req.query);
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
 
     const users = await prisma.user.findMany({
+      // Búsqueda parcial por nombre (case-insensitive) para el selector de usuarios
+      where: search ? { name: { contains: search, mode: 'insensitive' } } : undefined,
       select: { id: true, name: true, profileImage: true },
       orderBy: { name: 'asc' },
       ...(limit > 0 ? { take: limit, skip: offset } : {})

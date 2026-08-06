@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../db.js';
 import authenticate from '../middleware/auth.js';
 import logger from '../utils/logger.js';
+import { safeCreate } from '../utils/notifications.js';
 
 const router = Router();
 
@@ -72,14 +73,12 @@ router.post('/:token/accept', authenticate, async (req, res) => {
         where: { id: req.userId },
         select: { name: true }
       });
-      await prisma.notification.create({
-        data: {
-          userId: task.creatorId,
-          taskId: task.id,
-          type: 'INVITE_ACCEPTED',
-          message: `${joiner?.name || 'Un usuario'} se unió a tu tarea "${task.title}"${task.inviteRole === 'assignee' ? ' como asignado' : ''}`
-        }
-      }).catch(() => {});
+      await safeCreate(prisma, {
+        userId: task.creatorId,
+        taskId: task.id,
+        type: 'INVITE_ACCEPTED',
+        message: `${joiner?.name || 'Un usuario'} se unió a tu tarea "${task.title}"${task.inviteRole === 'assignee' ? ' como asignado' : ''}`
+      });
     }
 
     res.json({ message: 'Te uniste a la tarea', taskId: task.id });

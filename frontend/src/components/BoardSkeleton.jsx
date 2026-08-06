@@ -12,20 +12,20 @@ const SKELETON_COLUMNS = [
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-xl p-3 sm:p-4 pb-2 sm:pb-3 shadow-sm border border-gray-200 space-y-2">
+    <div className="bg-white dark:bg-gray-900 rounded-xl p-3 sm:p-4 pb-2 sm:pb-3 shadow-sm border border-gray-200 dark:border-gray-700 space-y-2">
       <div className="flex items-center justify-between">
-        <div className="w-16 h-2.5 bg-gray-200 rounded-full animate-pulse" />
-        <div className="w-10 h-3.5 bg-gray-100 rounded-full animate-pulse" />
+        <div className="w-16 h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+        <div className="w-10 h-3.5 bg-gray-100 dark:bg-gray-800 rounded-full animate-pulse" />
       </div>
-      <div className="w-3/4 h-3.5 bg-gray-200 rounded animate-pulse" />
-      <div className="w-full h-2.5 bg-gray-100 rounded animate-pulse" />
-      <div className="w-2/3 h-2.5 bg-gray-100 rounded animate-pulse" />
-      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+      <div className="w-3/4 h-3.5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      <div className="w-full h-2.5 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+      <div className="w-2/3 h-2.5 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+      <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
         <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded-full bg-gray-100 animate-pulse" />
-          <div className="w-8 h-2 bg-gray-100 rounded animate-pulse" />
+          <div className="w-4 h-4 rounded-full bg-gray-100 dark:bg-gray-800 animate-pulse" />
+          <div className="w-8 h-2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
         </div>
-        <div className="w-10 h-2.5 bg-gray-100 rounded animate-pulse" />
+        <div className="w-10 h-2.5 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
       </div>
     </div>
   );
@@ -33,9 +33,9 @@ function SkeletonCard() {
 
 export default function BoardSkeleton() {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
+    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-950">
       {/* Header skeleton */}
-      <header className="bg-white border-b border-gray-200 px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between shadow-sm">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-8 h-8 rounded-lg bg-gray-200 animate-pulse" />
           <div className="hidden sm:block w-24 h-4 bg-gray-200 rounded animate-pulse" />
@@ -54,7 +54,7 @@ export default function BoardSkeleton() {
         {SKELETON_COLUMNS.map((col) => (
           <div
             key={col.title}
-            className="flex-1 min-w-[220px] bg-gray-50 rounded-2xl p-3 sm:p-4 flex flex-col gap-3"
+            className="flex-1 min-w-[220px] bg-gray-50 dark:bg-gray-900 rounded-2xl p-3 sm:p-4 flex flex-col gap-3"
             aria-hidden="true"
           >
             <div className="flex items-center gap-2 px-1">

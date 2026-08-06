@@ -17,8 +17,8 @@ export default function TreeSpinner({ size = 'md', light = false, className = ''
   const s = SIZES[size] || SIZES.md;
   const ringColor = light
     ? 'border-white/30 border-t-white'
-    : 'border-emerald-100 border-t-emerald-600';
-  const treeColor = light ? 'text-white' : 'text-emerald-600';
+    : 'border-emerald-100 border-t-emerald-600 dark:border-emerald-900/60 dark:border-t-emerald-400';
+  const treeColor = light ? 'text-white' : 'text-emerald-600 dark:text-emerald-400';
 
   return (
     <div

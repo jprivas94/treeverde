@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ImageViewModal from './ImageViewModal';
 import { getCloudinaryThumb } from '../utils/images';
-
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
-function getToken() {
-  return localStorage.getItem('token');
-}
+import { uploadImageToCloudinary } from '../services/cloudinary';
 
 const MAX_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -80,35 +75,7 @@ export default function ImageUploadModal({ currentImages = [], onSave, onClose }
     setError('');
     setProgress(20);
     try {
-      const token = getToken();
-      const signRes = await fetch(API_BASE + '/upload/sign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ fileName: file.name, prefix: 'tasks', imageType: 'task' }),
-      });
-      if (!signRes.ok) {
-        const errData = await signRes.json().catch(() => ({}));
-        throw new Error(errData.error || 'Error al preparar la subida');
-      }
-      const { cloudName, apiKey, signature, timestamp, folder, transformations } = await signRes.json();
-      setProgress(40);
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('api_key', apiKey);
-      formData.append('timestamp', String(timestamp));
-      formData.append('signature', signature);
-      formData.append('folder', folder);
-      formData.append('transformation', transformations);
-      const uploadRes = await fetch('https://api.cloudinary.com/v1_1/' + cloudName + '/image/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!uploadRes.ok) {
-        const errText = await uploadRes.text().catch(() => 'Error desconocido');
-        throw new Error('Error al subir la imagen: ' + errText);
-      }
-      const uploadData = await uploadRes.json();
-      const publicUrl = uploadData.secure_url;
+      const publicUrl = await uploadImageToCloudinary({ file, prefix: 'tasks', imageType: 'task' });
       setProgress(100);
       setImages((prev) => [...prev, publicUrl]);
       setFile(null);
@@ -135,17 +102,17 @@ export default function ImageUploadModal({ currentImages = [], onSave, onClose }
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
+        className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <span className="text-base">{'\u{1F4F7}'}</span>
-            <h3 className="text-sm font-bold text-gray-900">
-              Imágenes {images.length > 0 && <span className="text-gray-400 font-normal">({images.length}/{MAX_IMAGES})</span>}
+            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+              Imágenes {images.length > 0 && <span className="text-gray-400 dark:text-gray-500 font-normal">({images.length}/{MAX_IMAGES})</span>}
             </h3>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
         </div>
 
         <div className="p-4 space-y-3">
@@ -158,8 +125,8 @@ export default function ImageUploadModal({ currentImages = [], onSave, onClose }
               onClick={() => fileInputRef.current?.click()}
               className={'border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition ' +
                 (preview
-                  ? 'border-emerald-300 bg-emerald-50/30'
-                  : 'border-gray-200 hover:border-gray-300 bg-gray-50')
+                  ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-950/30'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 bg-gray-50 dark:bg-gray-800')
               }
             >
               {preview ? (
@@ -179,8 +146,8 @@ export default function ImageUploadModal({ currentImages = [], onSave, onClose }
               ) : (
                 <div className="py-2">
                   <span className="text-2xl block mb-1">{'\u{1F4E4}'}</span>
-                  <p className="text-xs text-gray-500">Arrastra o haz clic para subir</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{images.length}/{MAX_IMAGES} usadas - JPG, PNG, WebP, GIF (max 10 MB)</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Arrastra o haz clic para subir</p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{images.length}/{MAX_IMAGES} usadas - JPG, PNG, WebP, GIF (max 10 MB)</p>
                 </div>
               )}
               <input
@@ -194,20 +161,20 @@ export default function ImageUploadModal({ currentImages = [], onSave, onClose }
           )}
 
           {!canAddMore && (
-            <div className="border-2 border-dashed rounded-lg p-4 text-center border-gray-200 bg-gray-50/50">
-              <p className="text-xs text-gray-400">Límite de {MAX_IMAGES} imágenes alcanzado</p>
+            <div className="border-2 border-dashed rounded-lg p-4 text-center border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50">
+              <p className="text-xs text-gray-400 dark:text-gray-500">Límite de {MAX_IMAGES} imágenes alcanzado</p>
             </div>
           )}
 
           {error && (
-            <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg flex items-center gap-1.5">
+            <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-3 py-2 rounded-lg flex items-center gap-1.5">
               <span>{'\u26A0\uFE0F'}</span>
               {error}
             </div>
           )}
 
           {uploading && (
-            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
               <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: progress + '%' }} />
             </div>
           )}
@@ -215,7 +182,7 @@ export default function ImageUploadModal({ currentImages = [], onSave, onClose }
           {/* Slider de imágenes subidas */}
           {images.length > 0 && (
             <div>
-              <p className="text-[10px] font-medium text-gray-500 mb-1.5">Imágenes subidas:</p>
+              <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-1.5">Imágenes subidas:</p>
               <div
                 ref={sliderRef}
                 className="flex gap-2 overflow-x-auto pb-1 scroll-smooth"
@@ -230,7 +197,7 @@ export default function ImageUploadModal({ currentImages = [], onSave, onClose }
                     <img
                       src={getCloudinaryThumb(url, 160)}
                       alt={`Imagen ${idx + 1}`}
-                      className="w-16 h-16 rounded-lg object-cover border border-gray-200"
+                      className="w-16 h-16 rounded-lg object-cover border border-gray-200 dark:border-gray-700"
                       loading="lazy"
                     />
                     {/* Overlay Ver más */}

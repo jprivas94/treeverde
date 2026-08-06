@@ -2,12 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import useKanbanStore from "../store/kanbanStore";
 import { profileApi } from "../services/api";
 import { broadcastProfileUpdate } from "../services/sessionSync";
-
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
-
-function getToken() {
-  return localStorage.getItem("token");
-}
+import { uploadImageToCloudinary } from "../services/cloudinary";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -66,35 +61,7 @@ export default function EditProfileModal({ onClose }) {
     setImageError('');
     setProgress(20);
     try {
-      const token = getToken();
-      const signRes = await fetch(API_BASE + '/upload/sign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ fileName: file.name, prefix: 'profiles', imageType: 'avatar' }),
-      });
-      if (!signRes.ok) {
-        const errData = await signRes.json().catch(() => ({}));
-        throw new Error(errData.error || 'Error al preparar la subida');
-      }
-      const { cloudName, apiKey, signature, timestamp, folder, transformations } = await signRes.json();
-      setProgress(40);
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('api_key', apiKey);
-      formData.append('timestamp', String(timestamp));
-      formData.append('signature', signature);
-      formData.append('folder', folder);
-      formData.append('transformation', transformations);
-      const uploadRes = await fetch('https://api.cloudinary.com/v1_1/' + cloudName + '/image/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!uploadRes.ok) {
-        const errText = await uploadRes.text().catch(() => 'Error desconocido');
-        throw new Error('Error al subir la imagen: ' + errText);
-      }
-      const uploadData = await uploadRes.json();
-      const publicUrl = uploadData.secure_url;
+      const publicUrl = await uploadImageToCloudinary({ file, prefix: 'profiles', imageType: 'avatar' });
       setProgress(100);
       setProfileImage(publicUrl);
       setFile(null);
@@ -169,20 +136,20 @@ export default function EditProfileModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <span className="text-lg">&#x1F464;</span>
-            <h2 className="text-base font-bold text-gray-900">Editar Perfil</h2>
+            <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">Editar Perfil</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none transition">&times;</button>
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none transition">&times;</button>
         </div>
         <form onSubmit={handleSave} className="p-5 space-y-4">
           <div className="flex flex-col items-center">
             <div ref={dropRef} onDrop={handleDrop} onDragOver={handleDragOver}
               onClick={() => fileInputRef.current?.click()}
               className="relative cursor-pointer group">
-              <div className={"w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold overflow-hidden border-2 transition-all duration-200 " + (preview ? "border-emerald-400 shadow-md" : "border-gray-200 bg-emerald-500 hover:border-emerald-300")}>
+              <div className={"w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold overflow-hidden border-2 transition-all duration-200 " + (preview ? "border-emerald-400 shadow-md" : "border-gray-200 dark:border-gray-600 bg-emerald-500 hover:border-emerald-300")}>
                 {preview ? <img src={preview} alt="Profile" className="w-full h-full object-cover" loading="lazy" /> : (user?.name?.charAt(0).toUpperCase() || "&#x1F464;")}
               </div>
               <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-all duration-200">
@@ -192,57 +159,57 @@ export default function EditProfileModal({ onClose }) {
               </div>
             </div>
             <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(e) => handleFileSelect(e.target.files[0])} />
-            <p className="text-[11px] text-gray-400 mt-1.5">JPG, PNG, WebP, GIF (max 10 MB)</p>
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5">JPG, PNG, WebP, GIF (max 10 MB)</p>
             {file && !uploadingImage && (
               <div className="flex gap-2 mt-2">
                 <button type="button" onClick={handleUploadImage} className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition">Subir imagen</button>
-                <button type="button" onClick={() => { setFile(null); setPreview(user?.profileImage || null); }} className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+                <button type="button" onClick={() => { setFile(null); setPreview(user?.profileImage || null); }} className="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Cancelar</button>
               </div>
             )}
             {profileImage && !file && <button type="button" onClick={handleRemoveImage} className="mt-2 text-xs text-red-500 hover:text-red-600 font-medium transition">Quitar foto</button>}
             {uploadingImage && (
               <div className="w-full max-w-[200px] mt-2">
-                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
                   <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: progress + "%" }} />
                 </div>
-                <p className="text-[10px] text-gray-400 text-center mt-0.5">Subiendo...</p>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-0.5">Subiendo...</p>
               </div>
             )}
-            {imageError && <p className="mt-1.5 text-xs text-red-600 bg-red-50 px-2 py-1 rounded-lg">{imageError}</p>}
+            {imageError && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-1 rounded-lg">{imageError}</p>}
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-            <div className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-500">{user?.email}</div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Email</label>
+            <div className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400">{user?.email}</div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-            <input type="text" required data-testid="profile-name-input" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" placeholder="Tu nombre" />
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Nombre</label>
+            <input type="text" required data-testid="profile-name-input" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition dark:bg-gray-800 dark:text-gray-100" placeholder="Tu nombre" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Nueva contrase&ntilde;a <span className="text-gray-400 font-normal">(dejar vac&iacute;o para mantener)</span></label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" placeholder="M&iacute;nimo 6 caracteres" minLength={6} />
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Nueva contrase&ntilde;a <span className="text-gray-400 dark:text-gray-500 font-normal">(dejar vac&iacute;o para mantener)</span></label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition dark:bg-gray-800 dark:text-gray-100" placeholder="M&iacute;nimo 6 caracteres" minLength={6} />
           </div>
           {password && (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Confirmar contrase&ntilde;a</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={"w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition " + (confirmPassword && password !== confirmPassword ? "border-red-300 bg-red-50" : "border-gray-200")} placeholder="Repite la contrase&ntilde;a" />
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Confirmar contrase&ntilde;a</label>
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={"w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition dark:bg-gray-800 dark:text-gray-100 " + (confirmPassword && password !== confirmPassword ? "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40" : "border-gray-200 dark:border-gray-600")} placeholder="Repite la contrase&ntilde;a" />
               {confirmPassword && password !== confirmPassword && <p className="mt-1 text-xs text-red-500">Las contrase&ntilde;as no coinciden</p>}
             </div>
           )}
           {error && (
-            <div className="text-xs text-red-600 bg-red-50 px-3 py-2.5 rounded-lg flex items-center gap-1.5 border border-red-100">
+            <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-3 py-2.5 rounded-lg flex items-center gap-1.5 border border-red-100 dark:border-red-900">
               <span>&#x26A0;&#xFE0F;</span>
               {error}
             </div>
           )}
           {successMsg && (
-            <div className="text-xs text-emerald-600 bg-emerald-50 px-3 py-2.5 rounded-lg flex items-center gap-1.5 border border-emerald-100">
+            <div className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2.5 rounded-lg flex items-center gap-1.5 border border-emerald-100 dark:border-emerald-900">
               <span>&#x2705;</span>
               {successMsg}
             </div>
           )}
           <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 text-sm border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">Cancelar</button>
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition">Cancelar</button>
             <button data-testid="profile-save-button" type="submit" disabled={saving || uploadingImage} className="flex-1 py-2.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg transition">
               {saving ? "Guardando..." : "Guardar cambios"}
             </button>
