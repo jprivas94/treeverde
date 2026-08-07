@@ -4,23 +4,23 @@ import { useEffect } from 'react';
 // Modal de confirmación para eliminar una tarea: pregunta si el usuario
 // está seguro y ofrece Aceptar (elimina) o Cancelar (vuelve al board).
 // Se cierra con ESC o clic en el overlay (equivale a Cancelar).
-export default function ConfirmDeleteModal({ task, onConfirm, onCancel }) {
-  // Cerrar con tecla ESC
+export default function ConfirmDeleteModal({ task, onConfirm, onCancel, loading = false }) {
+  // Cerrar con tecla ESC (bloqueado mientras se elimina)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape' && !loading) onCancel();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel]);
+  }, [onCancel, loading]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
-      {/* Overlay: clic fuera cancela */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      {/* Overlay: clic fuera cancela (bloqueado mientras se elimina) */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { if (!loading) onCancel(); }} />
 
       {/* Modal */}
-      <div role="dialog" aria-modal="true" aria-label="Confirmar eliminación"
+      <div role="dialog" aria-modal="true" aria-label="Confirmar eliminación" aria-busy={loading}
         className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl mx-auto max-w-md w-full overflow-hidden animate-scale-in">
         {/* Header con gradiente rojo */}
         <div className="bg-gradient-to-r from-red-500 to-rose-600 px-6 py-6 text-center">
@@ -41,17 +41,24 @@ export default function ConfirmDeleteModal({ task, onConfirm, onCancel }) {
             <button
               type="button"
               onClick={onCancel}
+              disabled={loading}
               autoFocus
-              className="py-2.5 text-sm font-medium border border-gray-200 dark:border-gray-600 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+              className="py-2.5 text-sm font-medium border border-gray-200 dark:border-gray-600 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
             <button
               type="button"
-              onClick={onConfirm}
-              className="py-2.5 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-xl transition shadow-lg shadow-red-600/25"
+              onClick={() => { if (!loading) onConfirm(); }}
+              disabled={loading}
+              className="py-2.5 text-sm font-semibold bg-red-600 hover:bg-red-700 disabled:opacity-70 disabled:cursor-wait text-white rounded-xl transition shadow-lg shadow-red-600/25 flex items-center justify-center gap-1.5"
             >
-              Aceptar
+              {loading ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Eliminando...
+                </>
+              ) : 'Aceptar'}
             </button>
           </div>
         </div>

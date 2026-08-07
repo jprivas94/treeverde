@@ -54,6 +54,7 @@ export default function Board({ isDark, onToggleTheme }) {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [completingTask, setCompletingTask] = useState(null);
   const [deletingTask, setDeletingTask] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [viewingImageIndex, setViewingImageIndex] = useState(null);
   const menuRef = useRef(null);
   const scrollRef = useRef(null);
@@ -299,6 +300,7 @@ export default function Board({ isDark, onToggleTheme }) {
   };
 
   const handleDeleteTask = async (task) => {
+    setDeleting(true);
     try {
       await tasksApi.remove(task.id);
       removeTask(task.id);
@@ -306,6 +308,8 @@ export default function Board({ isDark, onToggleTheme }) {
     } catch (err) {
       logger.error('Error al eliminar tarea', err, { taskId: task.id, taskTitle: task.title });
       setDeletingTask(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -577,6 +581,7 @@ export default function Board({ isDark, onToggleTheme }) {
             task={deletingTask}
             onConfirm={() => handleDeleteTask(deletingTask)}
             onCancel={() => setDeletingTask(null)}
+            loading={deleting}
           />
         </Suspense>
       )}

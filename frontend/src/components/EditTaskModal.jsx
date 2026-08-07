@@ -32,6 +32,7 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
   }));
   const [users, setUsers] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [sharedUsers, setSharedUsers] = useState(task.shares?.map((s) => s.user) || []);
   // Select para elegir con quién compartir
@@ -172,12 +173,13 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
   };
 
   const handleDelete = async () => {
-    setShowDeleteConfirm(false);
+    setDeleting(true);
     try {
       await tasksApi.remove(task.id);
       useKanbanStore.setState({ tasks: useKanbanStore.getState().tasks.filter((t) => t.id !== task.id) });
       onClose();
     } catch (err) { console.error(err); }
+    finally { setDeleting(false); }
   };
 
   // ─── Vistas de solo lectura (sharedView / readOnly) ────────────
@@ -351,7 +353,7 @@ export default function EditTaskModal({ task, onClose, readOnly, sharedView, use
       </div>
 
       {showDeleteConfirm && (
-        <ConfirmDeleteModal task={task} onConfirm={handleDelete} onCancel={onClose} />
+        <ConfirmDeleteModal task={task} onConfirm={handleDelete} onCancel={onClose} loading={deleting} />
       )}
     </div>
   );
