@@ -2,6 +2,18 @@
 // Guard: import.meta.env no existe fuera de Vite (tests con node:test).
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_URL) || '/api';
 
+// En producción, VITE_API_URL DEBE apuntar al backend terminando en /api.
+// Si falta, las peticiones irían al propio dominio del frontend (Vercel) y
+// el rewrite SPA las mandaría a index.html → 405 Method Not Allowed en
+// POST/PATCH/DELETE. Fallamos temprano con un mensaje accionable.
+if (import.meta.env && import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
+  console.error(
+    '[API] VITE_API_URL no está configurada en producción. ' +
+    'Las llamadas a /api se están haciendo contra el dominio del frontend y ' +
+    'fallarán con 405. Configúrala apuntando al backend terminando en /api.'
+  );
+}
+
 // ─── Configuración de reintentos ─────────────────────────────
 const MAX_RETRIES = 2;
 const RETRY_DELAY_BASE = 1200; // ms

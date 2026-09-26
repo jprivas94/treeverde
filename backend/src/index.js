@@ -50,6 +50,15 @@ app.get('/', (_req, res) => {
   res.send(renderRootPage(getFrontendUrl()));
 });
 
+// ─── Preflight a la raíz ──
+// Vercel puede enrutar el OPTIONS de un preflight a la raíz del serverless;
+// sin handler Express respondería 404/405 y el navegador abortaría la
+// petición real con un error confuso.
+app.options('/', (_req, res) => {
+  res.set('Allow', 'GET, OPTIONS');
+  res.status(204).end();
+});
+
 // ─── 404 para rutas API no encontradas ──
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
