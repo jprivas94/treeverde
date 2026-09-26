@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Board" ADD COLUMN "description" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Board" ADD COLUMN "icon" TEXT NOT NULL DEFAULT '🗂';

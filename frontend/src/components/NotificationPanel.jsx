@@ -14,7 +14,7 @@ const TYPE_ICONS = {
   INFO: '\u2139\uFE0F'
 };
 
-export default function NotificationPanel() {
+export default function NotificationPanel({ onColor = false }) {
   // Nota: useKanbanStore() sin selector ya suscribe a TODO el store, así que
   // cuando cambia supabaseToken el componente re-renderiza y isRealtimeActive()
   // (que lee el store vía getState) se re-evalúa automáticamente.
@@ -85,7 +85,9 @@ export default function NotificationPanel() {
       <button
         data-testid="notification-button"
         onClick={handleToggle}
-        className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition text-lg leading-none"
+        className={`relative p-1.5 sm:p-2 rounded-lg transition text-lg leading-none ${
+          onColor ? 'hover:bg-white/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+        }`}
         title="Notificaciones"
       >
         <span>{'\u{1F514}'}</span>

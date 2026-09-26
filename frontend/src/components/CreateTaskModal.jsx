@@ -27,6 +27,8 @@ export default function CreateTaskModal({ onClose }) {
 
   const addTask = useKanbanStore((s) => s.addTask);
   const user = useKanbanStore((s) => s.user);
+  // La tarea se crea dentro del tablero activo (si lo hay); el backend valida membresía
+  const activeBoardId = useKanbanStore((s) => s.activeBoardId);
   const titleRef = useRef(null);
   const searchSeq = useRef(0);
   // El foco inicial lo maneja TaskFormFields vía autoFocus + titleRef
@@ -64,7 +66,8 @@ export default function CreateTaskModal({ onClose }) {
         tags: form.tags.trim(),
         assigneeId: inviteMode ? null : (form.assigneeId || null),
         images: form.images,
-        subtasks: form.subtasks
+        subtasks: form.subtasks,
+        ...(activeBoardId ? { boardId: activeBoardId } : {})
       });
 
       // Modo invitación: generar el enlace (como asignado) y mostrar el panel

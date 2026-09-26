@@ -92,4 +92,80 @@ router.post('/:token/accept', authenticate, async (req, res) => {
   }
 });
 
+// ─── Invitación a un TABLERO (?boardInvite=TOKEN) ────────────────────
+
+// GET /api/invites/board/:token — información pública del enlace (banner de login/registro)
+router.get('/board/:token', async (req, res) => {
+  try {
+    const board = await prisma.board.findUnique({
+      where: { inviteToken: req.params.token },
+      select: {
+        id: true,
+        name: true,
+        icon: true,
+        owner: { select: { name: true } }
+      }
+    });
+    if (!board) {
+      return res.status(404).json({ error: 'Enlace de invitación inválido' });
+    }
+    res.json({
+      type: 'board',
+      boardId: board.id,
+      boardName: board.name,
+      boardIcon: board.icon,
+      ownerName: board.owner?.name || null
+    });
+  } catch (err) {
+    logger.error('Error al obtener invitación de tablero', err, { token: req.params?.token });
+    res.status(500).json({ error: 'Error al obtener invitación' });
+  }
+});
+
+// POST /api/invites/board/:token/accept — el usuario autenticado se une al tablero
+// Queda como miembro: puede ver y trabajar SOLO dentro de este tablero.
+// Idempotente: si ya es miembro, responde éxito sin duplicar.
+router.post('/board/:token/accept', authenticate, async (req, res) => {
+  try {
+    const board = await prisma.board.findUnique({
+      where: { inviteToken: req.params.token },
+      select: { id: true, name: true, ownerId: true, members: { select: { userId: true } } }
+    });
+    if (!board) {
+      return res.status(404).json({ error: 'Enlace de invitación inválido' });
+    }
+
+    // Idempotente: ya es miembro → no hacer nada
+    if (board.members.some((m) => m.userId === req.userId)) {
+      return res.json({ message: 'Ya eres parte de este tablero', boardId: board.id });
+    }
+
+    await prisma.boardMember.create({
+      data: { boardId: board.id, userId: req.userId, role: 'member' }
+    });
+
+    // Notificar al dueño que alguien aceptó (nunca romper la operación principal)
+    if (board.ownerId !== req.userId) {
+      const joiner = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { name: true }
+      });
+      await safeCreate(prisma, {
+        userId: board.ownerId,
+        type: 'INVITE_ACCEPTED',
+        message: `${joiner?.name || 'Un usuario'} se unió a tu tablero "${board.name}"`
+      });
+    }
+
+    res.json({ message: `Te uniste al tablero "${board.name}"`, boardId: board.id });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      // Carrera: la membresía ya existía entre el find y el create
+      return res.json({ message: 'Ya eres parte de este tablero', boardId: null });
+    }
+    logger.error('Error al aceptar invitación de tablero', err, { token: req.params?.token });
+    res.status(500).json({ error: 'Error al aceptar la invitación' });
+  }
+});
+
 export default router;

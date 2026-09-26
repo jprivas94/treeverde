@@ -6,7 +6,7 @@ import ThemeToggle from './ThemeToggle';
 import { getUserColor } from '../constants/kanbanConfig';
 import useKanbanStore from '../store/kanbanStore';
 import { tasksApi } from '../services/api';
-import { STATUS_NAV, TASKS_PAGE_SIZE } from '../constants/kanbanConfig';
+import { STATUS_NAV, TASKS_PAGE_SIZE, BOARD_COLORS } from '../constants/kanbanConfig';
 import logger from '../services/logger';
 import TreeLogo from './TreeLogo';
 import TreeSpinner from './TreeSpinner';
@@ -31,10 +31,22 @@ function ModalLoading() {
   );
 }
 
-export default function Board({ isDark, onToggleTheme }) {
+export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
   const user = useKanbanStore((s) => s.user);
   const logout = useKanbanStore((s) => s.logout);
   const tasks = useKanbanStore((s) => s.tasks);
+  const boards = useKanbanStore((s) => s.boards);
+  const activeBoardId = useKanbanStore((s) => s.activeBoardId);
+  // Datos del tablero activo (nombre/color para el header); null si es "Todas"
+  const activeBoard = useMemo(
+    () => boards.find((b) => b.id === activeBoardId) || null,
+    [boards, activeBoardId]
+  );
+  // Gradiente para el header del tablero activo (por defecto esmeralda)
+  const activeBoardGradient = activeBoard
+    ? (BOARD_COLORS[activeBoard.color]?.header || BOARD_COLORS.emerald.header)
+    : '';
+  const refreshBoardCounts = useKanbanStore((s) => s.refreshBoardCounts);
   const archivedTasks = useKanbanStore((s) => s.archivedTasks);
   const setTasks = useKanbanStore((s) => s.setTasks);
   const tasksLoaded = useKanbanStore((s) => s.tasksLoaded);
@@ -140,11 +152,12 @@ export default function Board({ isDark, onToggleTheme }) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Cargar tareas al montar (solo si no fueron precargadas en paralelo)
+  // Cargar tareas al montar (solo si no fueron precargadas en paralelo).
+  // Con tablero activo se piden filtradas por boardId; "Todas" no manda filtro.
   useEffect(() => {
     if (tasksLoaded) return;
     setTasksLoading(true);
-    tasksApi.getAll({ limit: TASKS_PAGE_SIZE })
+    tasksApi.getAll({ limit: TASKS_PAGE_SIZE, ...(activeBoardId ? { boardId: activeBoardId } : {}) })
       .then((data) => {
         setTasks(data, data.length === TASKS_PAGE_SIZE);
         setTasksLoading(false);
@@ -153,7 +166,7 @@ export default function Board({ isDark, onToggleTheme }) {
         console.error(err);
         setTasksLoading(false);
       });
-  }, [setTasks, tasksLoaded]);
+  }, [setTasks, tasksLoaded, activeBoardId]);
 
   // ─── Cargar más tareas (paginación) ────────────────
   const handleLoadMore = useCallback(async () => {
@@ -161,14 +174,18 @@ export default function Board({ isDark, onToggleTheme }) {
     const offset = tasks.length + archivedTasks.length;
     setLoadingMore(true);
     try {
-      const data = await tasksApi.getAll({ limit: TASKS_PAGE_SIZE, offset });
+      const data = await tasksApi.getAll({
+        limit: TASKS_PAGE_SIZE,
+        offset,
+        ...(activeBoardId ? { boardId: activeBoardId } : {}),
+      });
       appendTasks(data, data.length === TASKS_PAGE_SIZE);
     } catch (err) {
       logger.error('Error al cargar más tareas', err, { offset });
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, tasks.length, archivedTasks.length, appendTasks]);
+  }, [loadingMore, tasks.length, archivedTasks.length, appendTasks, activeBoardId]);
 
   // ─── Helpers de permisos ──────────────────────
   const isSharedUserForTask = useCallback((task) => {
@@ -327,16 +344,48 @@ export default function Board({ isDark, onToggleTheme }) {
     }
   }, [showGoodbye, logout]);
 
+  // Actualizar los conteos del tablero activo en el panel (myTaskCount/doneCount)
+  // cuando cambian las tareas visibles.
+  useEffect(() => {
+    refreshBoardCounts();
+  }, [refreshBoardCounts, tasks, archivedTasks]);
+
+  // ─── Header teñido por el tablero activo ──────────────────────
+  // Con tablero activo el header toma el gradiente de su color y el texto
+  // pasa a blanco para legibilidad. "Todas las tareas" e Historial conservan
+  // el header blanco/gris de siempre.
+  const headerClasses = activeBoard
+    ? `bg-gradient-to-r ${activeBoardGradient} shadow-sm`
+    : 'bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800';
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-950">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800 px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between shadow-sm">
+      <header className={`${headerClasses} px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between`}>
         <div className="flex items-center gap-2 sm:gap-3">
-          <TreeLogo className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
-          <h1 className="hidden sm:block text-lg font-bold text-gray-900 dark:text-gray-100">Treeverde</h1>
-          <span className="hidden sm:inline-block text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-            {showHistory ? 'Historial' : 'Tablero'}
-          </span>
+          <TreeLogo className={`w-6 h-6 sm:w-7 sm:h-7 ${activeBoard ? 'text-white' : 'text-emerald-600'}`} />
+          <h1 className={`hidden sm:block text-lg font-bold ${activeBoard ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>Treeverde</h1>
+          <button
+            onClick={onBackToBoards}
+            className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full transition ${
+              activeBoard && !showHistory
+                ? 'text-white bg-white/20 hover:bg-white/35'
+                : 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+            title="Volver a mis tableros"
+          >
+            {showHistory ? (
+              'Historial'
+            ) : activeBoard ? (
+              <>
+                <span aria-hidden="true">{activeBoard.icon || '🗂'}</span>
+                <span className="font-semibold">{activeBoard.name}</span>
+              </>
+            ) : (
+              'Todas las tareas'
+            )}
+            <span className="text-[10px]">▼</span>
+          </button>
 
           {/* Navegación de columnas (solo mobile) */}
           {!showHistory && (
@@ -370,22 +419,26 @@ export default function Board({ isDark, onToggleTheme }) {
           )}
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
-          {user && <NotificationPanel />}
-          <ThemeToggle isDark={isDark} onToggle={onToggleTheme} />
+          {user && <NotificationPanel onColor={Boolean(activeBoard)} />}
+          <ThemeToggle isDark={isDark} onToggle={onToggleTheme} onColor={Boolean(activeBoard)} />
           {user && (
             <div className="relative" ref={menuRef}>
               <button
                 data-testid="user-menu-button"
                 onClick={() => setShowUserMenu((v) => !v)}
-                className="flex items-center gap-1 sm:gap-3 pr-2 sm:pr-3 border-r border-gray-200 dark:border-gray-700 cursor-pointer hover:opacity-80 transition"
+                className={`flex items-center gap-1 sm:gap-3 pr-2 sm:pr-3 cursor-pointer hover:opacity-80 transition ${
+                  activeBoard
+                    ? 'border-r border-white/30'
+                    : 'border-r border-gray-200 dark:border-gray-700'
+                }`}
               >
                 <div className="relative">
                   <Avatar user={user} sizeClass="w-7 h-7 sm:w-8 sm:h-8 text-xs sm:text-sm" fallbackClass="bg-emerald-500 text-white" />
                   <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-400 border-2 border-white dark:border-gray-900 rounded-full" />
                 </div>
                 <div className="hidden sm:flex flex-col items-start">
-                  <span data-testid="user-menu-name" className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight">{user.name}</span>
-                  <span className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight">{user.email}</span>
+                  <span data-testid="user-menu-name" className={`text-sm font-semibold leading-tight ${activeBoard ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>{user.name}</span>
+                  <span className={`text-[11px] leading-tight ${activeBoard ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'}`}>{user.email}</span>
                 </div>
               </button>
 
@@ -419,6 +472,19 @@ export default function Board({ isDark, onToggleTheme }) {
               )}
             </div>
           )}
+
+          {/* Botón Mis tableros */}
+          <button
+            onClick={onBackToBoards}
+            className={`px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition shadow-sm ${
+              activeBoard
+                ? 'text-white bg-white/15 hover:bg-white/30'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <span className="sm:hidden">🏠</span>
+            <span className="hidden sm:inline">🗂 Mis tableros</span>
+          </button>
 
           {/* Botón Historial */}
           <button

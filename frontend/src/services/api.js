@@ -155,10 +155,36 @@ export const tasksApi = {
     })
 };
 
+// ─── Boards (tableros) ─────────────────────────
+export const boardsApi = {
+  getAll: () => request('/boards'),
+  getById: (id) => request(`/boards/${id}`),
+  create: ({ name, description, color, icon }) =>
+    request('/boards', {
+      method: 'POST',
+      body: JSON.stringify({ name, description, color, icon })
+    }),
+  update: (id, data) =>
+    request(`/boards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+  remove: (id) => request(`/boards/${id}`, { method: 'DELETE' }),
+  // Genera (o regenera) el enlace de invitación al tablero (solo dueño)
+  invite: (id) =>
+    request(`/boards/${id}/invite`, { method: 'POST' }),
+  // Quita un miembro del tablero (solo dueño)
+  removeMember: (id, userId) =>
+    request(`/boards/${id}/members/${userId}`, { method: 'DELETE' })
+};
+
 // ─── Invitaciones por URL ─────────────────────
 export const invitesApi = {
   getInfo: (token) => request(`/invites/${token}`),
-  accept: (token) => request(`/invites/${token}/accept`, { method: 'POST' })
+  accept: (token) => request(`/invites/${token}/accept`, { method: 'POST' }),
+  // Invitación a un tablero (?boardInvite=TOKEN)
+  getBoardInfo: (token) => request(`/invites/board/${token}`),
+  acceptBoard: (token) => request(`/invites/board/${token}/accept`, { method: 'POST' })
 };
 
 // ─── Users ─────────────────────────────────────

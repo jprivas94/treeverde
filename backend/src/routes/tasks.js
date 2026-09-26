@@ -26,17 +26,38 @@ const TASK_INCLUDE = {
   }
 };
 
+// ¿El usuario es miembro (o dueño) del tablero indicado?
+// Devuelve el board si es válido para el usuario, o null.
+async function resolveBoardForUser(boardId, userId) {
+  if (!boardId) return null;
+  const board = await prisma.board.findUnique({
+    where: { id: boardId },
+    include: { members: { select: { userId: true } } }
+  });
+  if (!board) return null;
+  return board.members.some((m) => m.userId === userId) ? board : null;
+}
+
 // Todas las rutas de tasks requieren autenticación
 router.use(authenticate);
 
 // GET /api/tasks — obtener tareas donde el usuario es creador, asignado o invitado
+// Filtro opcional: ?boardId=<id> (solo devuelve tareas si el usuario pertenece al tablero)
 // Paginación opcional: ?limit=50&offset=0 (máx 500 por página; sin limit = todas)
 router.get('/', async (req, res) => {
   try {
     const { limit, offset } = parsePagination(req.query);
 
+    // Filtrar por tablero: si el board no existe o el usuario no es miembro,
+    // devolvemos lista vacía (no 403, para no filtrar existencia de tableros).
+    if (req.query.boardId) {
+      const board = await resolveBoardForUser(req.query.boardId, req.userId);
+      if (!board) return res.json([]);
+    }
+
     const tasks = await prisma.task.findMany({
       where: {
+        ...(req.query.boardId ? { boardId: req.query.boardId } : {}),
         OR: [
           { creatorId: req.userId },
           { assigneeId: req.userId },
@@ -76,12 +97,20 @@ router.get('/:id', async (req, res) => {
 // POST /api/tasks — crear una tarea
 router.post('/', async (req, res) => {
   try {
-    const { title, description, assigneeId, priority, dueDate, tags, images, subtasks } = req.body;
+    const { title, description, assigneeId, priority, dueDate, tags, images, subtasks, boardId } = req.body;
 
     // Validar el cuerpo ANTES de tocar la base de datos
     const validationError = validateTaskCreate(req.body);
     if (validationError) {
       return res.status(400).json({ error: validationError });
+    }
+
+    // Validar que el tablero existe y el usuario es miembro (si se indica)
+    if (boardId) {
+      const board = await resolveBoardForUser(boardId, req.userId);
+      if (!board) {
+        return res.status(400).json({ error: 'Tablero inválido o sin acceso' });
+      }
     }
 
     // Validar que el usuario asignado existe
@@ -103,7 +132,8 @@ router.post('/', async (req, res) => {
         images: images || [],
         subtasks: subtasks || [],
         assigneeId: assigneeId || null,
-        creatorId: req.userId
+        creatorId: req.userId,
+        boardId: boardId || null
       },
       include: {
         assignee: { select: USER_SELECT },
@@ -207,7 +237,7 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para modificar esta tarea' });
     }
 
-    const { title, description, assigneeId, status, priority, dueDate, tags, images, subtasks } = req.body;
+    const { title, description, assigneeId, status, priority, dueDate, tags, images, subtasks, boardId } = req.body;
 
     // Validar solo los campos presentes (la actualización es parcial)
     const validationError = validateTaskUpdate(req.body);
@@ -226,6 +256,14 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    // Validar que el tablero existe y el usuario es miembro (si se cambia)
+    if (boardId !== undefined && !isAssigneeOnly) {
+      const board = await resolveBoardForUser(boardId, req.userId);
+      if (!board) {
+        return res.status(400).json({ error: 'Tablero inválido o sin acceso' });
+      }
+    }
+
     const data = {};
     if (title !== undefined) data.title = title.trim();
     if (description !== undefined) data.description = description.trim();
@@ -236,6 +274,7 @@ router.put('/:id', async (req, res) => {
     if (tags !== undefined) data.tags = tags;
     if (images !== undefined) data.images = images;
     if (subtasks !== undefined) data.subtasks = subtasks;
+    if (!isAssigneeOnly && boardId !== undefined) data.boardId = boardId || null;
 
     const task = await prisma.task.update({
       where: { id },

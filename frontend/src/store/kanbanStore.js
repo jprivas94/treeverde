@@ -21,6 +21,46 @@ const useKanbanStore = create((set, get) => ({
   // true si hay más páginas de tareas por cargar (paginación)
   tasksHasMore: false,
 
+  // ─── Boards (tableros) ─────────────────────
+  // Lista de tableros donde el usuario es dueño o miembro. boardsLoaded
+  // evita re-fetch al volver del tablero al panel. activeBoardId guarda el
+  // tablero abierto (null = vista de todos).
+  boards: [],
+  boardsLoaded: false,
+  activeBoardId: null,
+
+  setBoards: (boards) => set({ boards, boardsLoaded: true }),
+
+  addBoard: (board) => set((s) => ({ boards: [...s.boards, board] })),
+
+  updateBoard: (boardId, updates) =>
+    set((s) => ({
+      boards: s.boards.map((b) => (b.id === boardId ? { ...b, ...updates } : b)),
+    })),
+
+  removeBoard: (boardId) =>
+    set((s) => ({
+      boards: s.boards.filter((b) => b.id !== boardId),
+      // Si se elimina el tablero activo, volver a la vista general
+      activeBoardId: s.activeBoardId === boardId ? null : s.activeBoardId,
+    })),
+
+  setActiveBoard: (boardId) => set({ activeBoardId: boardId }),
+
+  // Conteo de tareas visibles del tablero activo (para refrescar el panel)
+  refreshBoardCounts: () =>
+    set((s) => ({
+      boards: s.boards.map((b) =>
+        b.id === s.activeBoardId
+          ? {
+              ...b,
+              myTaskCount: s.tasks.length,
+              doneCount: s.tasks.filter((t) => t.status === 'DONE').length + s.archivedTasks.length,
+            }
+          : b
+      ),
+    })),
+
   // ─── Auth ──────────────────────────────────
   setUser: (user, token, supabaseToken = null) => {
     if (token) localStorage.setItem('token', token);
@@ -29,7 +69,7 @@ const useKanbanStore = create((set, get) => ({
 
   logout: ({ broadcast = true } = {}) => {
     localStorage.removeItem('token');
-    set({ user: null, token: null, supabaseToken: null, tasks: [], archivedTasks: [], tasksLoaded: false, tasksHasMore: false });
+    set({ user: null, token: null, supabaseToken: null, tasks: [], archivedTasks: [], tasksLoaded: false, tasksHasMore: false, boards: [], boardsLoaded: false, activeBoardId: null });
     // Avisar a las demás pestañas (solo desde la pestaña originaria;
     // el flag evita un bucle cuando el logout viene de otra pestaña vía BroadcastChannel).
     if (broadcast) broadcastLogout();

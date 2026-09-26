@@ -59,6 +59,77 @@ export const TRANSITION_LABELS = {
   'DONE->ARCHIVED': 'Terminar',
 };
 
+// ─── Colores de tableros (BoardsPanel + backend VALID_COLORS) ──
+// Cada color define: gradiente (tarjeta/banners), dot (barra superior),
+// soft (fondo suave del icono), border (borde de acento), text (texto de acento),
+// tint (tinte de fondo de tarjeta), ring (anillo del picker) y header
+// (fondo del header del tablero abierto; sobre él el texto va en blanco).
+export const BOARD_COLORS = {
+  emerald: {
+    dot: 'bg-emerald-500',
+    gradient: 'from-emerald-500 via-emerald-600 to-teal-600',
+    header: 'from-emerald-500 to-teal-600 dark:from-emerald-700 dark:to-teal-800',
+    soft: 'bg-emerald-100 dark:bg-emerald-950/40',
+    border: 'hover:border-emerald-400 dark:hover:border-emerald-600',
+    tint: 'hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20',
+    text: 'text-emerald-600 dark:text-emerald-400',
+    ring: 'ring-emerald-500',
+  },
+  blue: {
+    dot: 'bg-blue-500',
+    gradient: 'from-blue-500 via-blue-600 to-indigo-600',
+    header: 'from-blue-500 to-indigo-600 dark:from-blue-700 dark:to-indigo-800',
+    soft: 'bg-blue-100 dark:bg-blue-950/40',
+    border: 'hover:border-blue-400 dark:hover:border-blue-600',
+    tint: 'hover:bg-blue-50/60 dark:hover:bg-blue-950/20',
+    text: 'text-blue-600 dark:text-blue-400',
+    ring: 'ring-blue-500',
+  },
+  violet: {
+    dot: 'bg-violet-500',
+    gradient: 'from-violet-500 via-violet-600 to-purple-600',
+    header: 'from-violet-500 to-purple-600 dark:from-violet-700 dark:to-purple-800',
+    soft: 'bg-violet-100 dark:bg-violet-950/40',
+    border: 'hover:border-violet-400 dark:hover:border-violet-600',
+    tint: 'hover:bg-violet-50/60 dark:hover:bg-violet-950/20',
+    text: 'text-violet-600 dark:text-violet-400',
+    ring: 'ring-violet-500',
+  },
+  amber: {
+    dot: 'bg-amber-500',
+    gradient: 'from-amber-400 via-amber-500 to-orange-500',
+    header: 'from-amber-500 to-orange-600 dark:from-amber-700 dark:to-orange-800',
+    soft: 'bg-amber-100 dark:bg-amber-950/40',
+    border: 'hover:border-amber-400 dark:hover:border-amber-600',
+    tint: 'hover:bg-amber-50/60 dark:hover:bg-amber-950/20',
+    text: 'text-amber-600 dark:text-amber-400',
+    ring: 'ring-amber-500',
+  },
+  rose: {
+    dot: 'bg-rose-500',
+    gradient: 'from-rose-500 via-rose-600 to-pink-600',
+    header: 'from-rose-500 to-pink-600 dark:from-rose-700 dark:to-pink-800',
+    soft: 'bg-rose-100 dark:bg-rose-950/40',
+    border: 'hover:border-rose-400 dark:hover:border-rose-600',
+    tint: 'hover:bg-rose-50/60 dark:hover:bg-rose-950/20',
+    text: 'text-rose-600 dark:text-rose-400',
+    ring: 'ring-rose-500',
+  },
+  cyan: {
+    dot: 'bg-cyan-500',
+    gradient: 'from-cyan-500 via-cyan-600 to-sky-600',
+    header: 'from-cyan-500 to-sky-600 dark:from-cyan-700 dark:to-sky-800',
+    soft: 'bg-cyan-100 dark:bg-cyan-950/40',
+    border: 'hover:border-cyan-400 dark:hover:border-cyan-600',
+    tint: 'hover:bg-cyan-50/60 dark:hover:bg-cyan-950/20',
+    text: 'text-cyan-600 dark:text-cyan-400',
+    ring: 'ring-cyan-500',
+  },
+};
+
+// Emojis disponibles para el icono del tablero (debe coincidir con VALID_ICONS del backend)
+export const BOARD_ICONS = ['🗂', '📋', '🚀', '💼', '🎨', '🐛', '🌱', '⚡', '🔧', '📚', '🎯', '🏠'];
+
 // ─── Prioridades ──────────────────────────────
 // value → etiqueta y estilos (compartidos por CreateTaskModal y EditTaskModal)
 export const PRIORITIES = [

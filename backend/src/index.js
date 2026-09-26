@@ -1,7 +1,11 @@
+import dotenv from 'dotenv';
+// El .env local tiene prioridad sobre variables heredadas de la terminal (ej. PORT=0)
+dotenv.config({ override: true });
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import taskRoutes from './routes/tasks.js';
+import boardRoutes from './routes/boards.js';
 import userRoutes from './routes/users.js';
 import uploadRoutes from './routes/upload.js';
 import notificationRoutes from './routes/notifications.js';
@@ -31,6 +35,7 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/boards', boardRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
