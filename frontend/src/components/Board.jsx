@@ -532,89 +532,94 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
         <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8"><TreeSpinner size="lg" /></div>}>
           <CompletedTasksPanel tasks={tasks} archivedTasks={archivedTasks} onEditTask={handleViewTask} />
         </Suspense>
-      ) : tasks.length === 0 && archivedTasks.length === 0 && !tasksHasMore ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 flex items-center justify-center mb-4">
-            <TreeLogo className="w-11 h-11 sm:w-14 sm:h-14 text-emerald-500" />
-          </div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">No hay tareas visibles</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-6">
-            Aún no tienes tareas creadas, asignadas o compartidas contigo.
-            ¡Crea tu primera tarea para empezar!
-          </p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition shadow-sm"
-          >
-            + Crear primera tarea
-          </button>
-        </div>
       ) : (
         <>
           <div className="px-4 pt-4 pb-2">
             <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Tablero</h2>
           </div>
-          <DragDropContext onDragEnd={onDragEnd}>
-            <div className="flex-1 flex flex-col overflow-hidden p-4 sm:p-6 min-h-0">
-              <div
-                ref={scrollRef}
-                onScroll={handleScroll}
-                className="flex gap-4 sm:gap-5 overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory sm:snap-none pb-2 sm:pb-0 scroll-smooth column-scroll flex-1 h-full"
-              >
-                {columns.map((column) => (
-                  <Column
-                    key={column.id}
-                    column={column}
-                    onEditTask={handleEditTask}
-                    onMoveTask={handleMoveTask}
-                    onViewImage={handleViewImage}
-                    onDeleteTask={setDeletingTask}
-                    canDeleteForTask={(task) => user?.id === task.creator?.id}
-                    fixedHeight={column.id !== 'TODO' ? referenceHeight : undefined}
-                    todoRef={column.id === 'TODO' ? todoColumnRef : undefined}
-                    isSharedUserForTask={isSharedUserForTask}
-                  />
-                ))}
-              </div>
-              {/* Dots de navegacion (solo mobile) */}
-              <div className="flex items-center justify-center gap-1.5 pt-2 pb-1 sm:hidden">
-                {columns.map((col, i) => (
-                  <button
-                    key={col.id}
-                    onClick={() => scrollToColumn(i)}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      i === activeColumn
-                        ? 'bg-emerald-500 w-3'
-                        : 'bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600'
-                    }`}
-                    aria-label={`Ir a ${col.title}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </DragDropContext>
 
-          {/* Cargar más tareas (paginación) */}
-          {tasksHasMore && (
-            <div className="flex justify-center pb-3">
+          {tasks.length === 0 && archivedTasks.length === 0 && !tasksHasMore ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 flex items-center justify-center mb-5">
+                <TreeLogo className="w-11 h-11 sm:w-14 sm:h-14 text-emerald-500" />
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">No hay tareas visibles</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-6">
+                Aún no tienes tareas creadas, asignadas o compartidas contigo.
+                ¡Crea tu primera tarea para empezar!
+              </p>
               <button
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-emerald-700 dark:text-emerald-400 rounded-xl shadow-sm hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                onClick={() => setShowModal(true)}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition shadow-sm"
               >
-                {loadingMore ? (
-                  <>
-                    <TreeSpinner size="xs" />
-                    Cargando...
-                  </>
-                ) : (
-                  <>
-                    <span>⬇️</span>
-                    Cargar más tareas
-                  </>
-                )}
+                + Crear primera tarea
               </button>
             </div>
+          ) : (
+            <>
+              <DragDropContext onDragEnd={onDragEnd}>
+                <div className="flex-1 flex flex-col overflow-hidden p-4 sm:p-6 min-h-0">
+                  <div
+                    ref={scrollRef}
+                    onScroll={handleScroll}
+                    className="flex gap-4 sm:gap-5 overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory sm:snap-none pb-2 sm:pb-0 scroll-smooth column-scroll flex-1 h-full"
+                  >
+                    {columns.map((column) => (
+                      <Column
+                        key={column.id}
+                        column={column}
+                        onEditTask={handleEditTask}
+                        onMoveTask={handleMoveTask}
+                        onViewImage={handleViewImage}
+                        onDeleteTask={setDeletingTask}
+                        canDeleteForTask={(task) => user?.id === task.creator?.id}
+                        fixedHeight={column.id !== 'TODO' ? referenceHeight : undefined}
+                        todoRef={column.id === 'TODO' ? todoColumnRef : undefined}
+                        isSharedUserForTask={isSharedUserForTask}
+                      />
+                    ))}
+                  </div>
+                  {/* Dots de navegacion (solo mobile) */}
+                  <div className="flex items-center justify-center gap-1.5 pt-2 pb-1 sm:hidden">
+                    {columns.map((col, i) => (
+                      <button
+                        key={col.id}
+                        onClick={() => scrollToColumn(i)}
+                        className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                          i === activeColumn
+                            ? 'bg-emerald-500 w-3'
+                            : 'bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600'
+                        }`}
+                        aria-label={`Ir a ${col.title}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </DragDropContext>
+
+              {/* Cargar más tareas (paginación) */}
+              {tasksHasMore && (
+                <div className="flex justify-center pb-3">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-emerald-700 dark:text-emerald-400 rounded-xl shadow-sm hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <TreeSpinner size="xs" />
+                        Cargando...
+                      </>
+                    ) : (
+                      <>
+                        <span>⬇️</span>
+                        Cargar más tareas
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
