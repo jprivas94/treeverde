@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useKanbanStore from '../store/kanbanStore';
 import { boardsApi } from '../services/api';
 import Avatar from './Avatar';
 
@@ -9,6 +10,7 @@ import Avatar from './Avatar';
 // enlace; cada generación invalida el anterior. También permite quitar
 // miembros (no al dueño).
 export default function InviteBoardModal({ board, onClose, onMembersChanged }) {
+  const user = useKanbanStore((s) => s.user);
   const [inviteUrl, setInviteUrl] = useState('');
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -16,7 +18,7 @@ export default function InviteBoardModal({ board, onClose, onMembersChanged }) {
   const errorTimer = useRef(null);
   const [error, setError] = useState('');
 
-  const isOwner = board.ownerId === board.members?.find((m) => m.role === 'owner')?.id || board.ownerId;
+  const isOwner = board.ownerId === user?.id || board.members?.some((m) => m.id === user?.id && m.role === 'owner');
 
   // Borrar el enlace previo cuando cambia el tablero (seguridad ante reuso)
   useEffect(() => {

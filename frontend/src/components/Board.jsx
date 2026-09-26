@@ -5,7 +5,7 @@ import NotificationPanel from './NotificationPanel';
 import ThemeToggle from './ThemeToggle';
 import { getUserColor } from '../constants/kanbanConfig';
 import useKanbanStore from '../store/kanbanStore';
-import { tasksApi } from '../services/api';
+import { tasksApi, boardsApi } from '../services/api';
 import { STATUS_NAV, TASKS_PAGE_SIZE, BOARD_COLORS } from '../constants/kanbanConfig';
 import logger from '../services/logger';
 import TreeLogo from './TreeLogo';
@@ -21,6 +21,7 @@ const TaskCompleteModal = lazy(() => import('./TaskCompleteModal'));
 const ImageViewModal = lazy(() => import('./ImageViewModal'));
 const EditTaskModal = lazy(() => import('./EditTaskModal'));
 const ConfirmDeleteModal = lazy(() => import('./ConfirmDeleteModal'));
+const InviteBoardModal = lazy(() => import('./InviteBoardModal'));
 
 // Fallback mientras se descarga un chunk diferido
 function ModalLoading() {
@@ -46,6 +47,7 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
   const activeBoardGradient = activeBoard
     ? (BOARD_COLORS[activeBoard.color]?.header || BOARD_COLORS.emerald.header)
     : '';
+  const setBoards = useKanbanStore((s) => s.setBoards);
   const refreshBoardCounts = useKanbanStore((s) => s.refreshBoardCounts);
   const archivedTasks = useKanbanStore((s) => s.archivedTasks);
   const setTasks = useKanbanStore((s) => s.setTasks);
@@ -58,6 +60,7 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
   const restoreTask = useKanbanStore((s) => s.restoreTask);
   const getColumns = useKanbanStore((s) => s.getColumns);
   const [showModal, setShowModal] = useState(false);
+  const [showInviteBoard, setShowInviteBoard] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [viewingTask, setViewingTask] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -387,6 +390,24 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
             <span className="text-[10px]">▼</span>
           </button>
 
+          {/* Miembros del tablero activo (acceso rápido a invitar/miembros) */}
+          {activeBoard && !showHistory && activeBoard.members?.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowInviteBoard(true)}
+              className="hidden md:flex items-center -space-x-1.5 cursor-pointer hover:opacity-90 transition pl-1 py-0.5 focus:outline-none"
+              title={`Ver miembros e invitar a ${activeBoard.name}`}
+              aria-label={`Ver miembros del tablero ${activeBoard.name}`}
+            >
+              {activeBoard.members.slice(0, 3).map((m) => (
+                <Avatar key={m.id} user={m} sizeClass="w-6 h-6 text-[9px] ring-2 ring-white/30" fallbackClass="bg-white/20 text-white" />
+              ))}
+              {activeBoard.members.length > 3 && (
+                <span className="text-[10px] text-white/90 pl-2">+{activeBoard.members.length - 3}</span>
+              )}
+            </button>
+          )}
+
           {/* Navegación de columnas (solo mobile) */}
           {!showHistory && (
             <div className="flex items-center gap-1 sm:hidden">
@@ -471,6 +492,19 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Botón Invitar al tablero (disponible en el header del tablero creado) */}
+          {activeBoard && !showHistory && (
+            <button
+              data-testid="invite-board-button"
+              onClick={() => setShowInviteBoard(true)}
+              className="px-2 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition shadow-sm flex items-center gap-1.5 text-white bg-white/20 hover:bg-white/35 border border-white/25 backdrop-blur-xs"
+              title={`Invitar al tablero ${activeBoard.name}`}
+            >
+              <span aria-hidden="true">👥</span>
+              <span className="hidden sm:inline">Invitar</span>
+            </button>
           )}
 
           {/* Botón Mis tableros */}
@@ -678,6 +712,18 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
             currentIndex={viewingImageIndex}
             onClose={() => setViewingImageIndex(null)}
             onNavigate={handleNavigateImage}
+          />
+        </Suspense>
+      )}
+
+      {showInviteBoard && activeBoard && (
+        <Suspense fallback={<ModalLoading />}>
+          <InviteBoardModal
+            board={activeBoard}
+            onClose={() => setShowInviteBoard(false)}
+            onMembersChanged={() => {
+              boardsApi.getAll().then(setBoards).catch(() => {});
+            }}
           />
         </Suspense>
       )}

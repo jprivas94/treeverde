@@ -19,6 +19,7 @@ const USER_SELECT = { id: true, name: true, profileImage: true };
 const TASK_INCLUDE = {
   assignee: { select: USER_SELECT },
   creator: { select: USER_SELECT },
+  board: { select: { id: true, name: true, color: true, icon: true } },
   shares: {
     include: {
       user: { select: USER_SELECT }
@@ -137,7 +138,8 @@ router.post('/', async (req, res) => {
       },
       include: {
         assignee: { select: USER_SELECT },
-        creator: { select: USER_SELECT }
+        creator: { select: USER_SELECT },
+        board: { select: { id: true, name: true, color: true, icon: true } }
       }
     });
 

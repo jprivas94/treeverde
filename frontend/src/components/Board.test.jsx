@@ -215,7 +215,7 @@ test('Board: el historial vacio muestra su estado vacio y el badge del header ca
   seedStore({ tasks: [], archivedTasks: [] });
   const { getByRole, getByText } = renderBoard();
 
-  getByText('Tablero');
+  getByText('Todas las tareas');
 
   fireEvent.click(getByRole('button', { name: /Historial/ }));
 
@@ -269,3 +269,35 @@ test('Board: el no creador no ve el boton Eliminar en la tarjeta', () => {
   const { queryByTitle } = renderBoard();
   assert.equal(queryByTitle('Eliminar'), null, 'el no creador no ve el boton eliminar');
 });
+
+test('Board: muestra boton Invitar en header cuando hay un tablero activo y abre InviteBoardModal', async () => {
+  const activeBoard = {
+    id: 'b1',
+    name: 'Tablero Principal',
+    color: 'emerald',
+    icon: '🚀',
+    ownerId: USER.id,
+    members: [{ ...USER, role: 'owner' }]
+  };
+  seedStore({
+    boards: [activeBoard],
+    activeBoardId: 'b1',
+    tasks: []
+  });
+
+  const { getByTestId, findByText, getByText } = renderBoard();
+
+  // El nombre del tablero activo se muestra en el header
+  getByText('Tablero Principal');
+
+  // El botón Invitar está presente
+  const inviteBtn = getByTestId('invite-board-button');
+  assert.ok(inviteBtn, 'el botón de invitar debe estar en el header del tablero');
+
+  fireEvent.click(inviteBtn);
+
+  // Se abre el modal de invitar al tablero
+  const modalTitle = await findByText('Invitar al tablero');
+  assert.ok(modalTitle, 'debe abrir el modal de invitar al tablero');
+});
+
