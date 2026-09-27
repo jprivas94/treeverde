@@ -58,8 +58,8 @@ export default function BoardCard({ board, isOwner, onOpen, onInvite, onEdit, on
           {menuOpen && (
             <div className="absolute top-8 right-0 w-40 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-1.5 animate-fade-scale-in z-30">
               <MenuItem icon="👥" onClick={menuAction(onInvite)}>Invitar personas</MenuItem>
-              <MenuItem icon="✏️" onClick={menuAction(onEdit)}>Editar tablero</MenuItem>
-              <MenuItem icon="🗑" danger onClick={menuAction(onDelete)}>Eliminar tablero</MenuItem>
+              <MenuItem icon="✏️" onClick={menuAction(onEdit)}>Editar proyecto</MenuItem>
+              <MenuItem icon="🗑" danger onClick={menuAction(onDelete)}>Eliminar proyecto</MenuItem>
             </div>
           )}
         </div>

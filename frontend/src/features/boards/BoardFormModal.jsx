@@ -34,7 +34,7 @@ export default function BoardFormModal({ board, onClose, onSaved }) {
     try {
       onSaved(isEdit ? await boardsApi.update(board.id, data) : await boardsApi.create(data));
     } catch (err) {
-      setError(err.message || (isEdit ? 'No se pudo guardar el tablero' : 'No se pudo crear el tablero'));
+      setError(err.message || (isEdit ? 'No se pudo guardar el proyecto' : 'No se pudo crear el proyecto'));
       setSaving(false);
     }
   };
@@ -42,7 +42,7 @@ export default function BoardFormModal({ board, onClose, onSaved }) {
   return (
     <Modal onClose={onClose}>
       <ModalHeader
-        title={isEdit ? 'Editar tablero' : 'Nuevo tablero'}
+        title={isEdit ? 'Editar proyecto' : 'Nuevo proyecto'}
         onClose={onClose}
         className="flex items-center justify-between mb-4 px-5 sm:px-6 pt-5"
         titleClassName="text-base font-bold text-gray-900 dark:text-gray-100"
@@ -55,7 +55,7 @@ export default function BoardFormModal({ board, onClose, onSaved }) {
             <div className="flex items-center gap-3 px-4 py-3.5">
               <span className="text-2xl drop-shadow-sm">{form.icon}</span>
               <div className="min-w-0">
-                <p className="font-bold text-white truncate drop-shadow-sm">{form.name.trim() || 'Nombre del tablero'}</p>
+                <p className="font-bold text-white truncate drop-shadow-sm">{form.name.trim() || 'Nombre del proyecto'}</p>
                 <p className="text-[11px] text-white/85 truncate">{form.description.trim() || 'Una breve descripción…'}</p>
               </div>
             </div>
@@ -85,7 +85,7 @@ export default function BoardFormModal({ board, onClose, onSaved }) {
             onChange={(e) => set('description')(e.target.value)}
             maxLength={200}
             rows={2}
-            placeholder="¿De qué trata este tablero?"
+            placeholder="¿De qué trata este proyecto?"
             className={`${input} resize-none`}
           />
         </div>
@@ -146,7 +146,7 @@ export default function BoardFormModal({ board, onClose, onSaved }) {
             disabled={saving || !form.name.trim()}
             className="py-2 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg transition flex items-center justify-center gap-1.5"
           >
-            {saving ? <><Spinner /> Guardando</> : isEdit ? 'Guardar cambios' : 'Crear tablero'}
+            {saving ? <><Spinner /> Guardando</> : isEdit ? 'Guardar cambios' : 'Crear proyecto'}
           </button>
         </div>
       </form>

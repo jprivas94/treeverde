@@ -45,7 +45,7 @@ export default function BoardsPanel({ isDark, onToggleTheme, onSelectBoard, onSe
         onLogout={() => logout()}
         left={
           <span className="hidden sm:inline-block text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-            Mis tableros
+            Mis Proyectos
           </span>
         }
       />
@@ -53,14 +53,14 @@ export default function BoardsPanel({ isDark, onToggleTheme, onSelectBoard, onSe
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="mb-6 sm:mb-8 flex items-end justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Elige un tablero</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Todos los tableros donde trabajas, en un solo lugar.</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Elige un proyecto</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Todos los proyectos donde trabajas, en un solo lugar.</p>
           </div>
           <button
             onClick={openCreate}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm shadow-emerald-600/25 transition flex items-center gap-1.5"
           >
-            <span className="text-lg leading-none">+</span> Nuevo tablero
+            <span className="text-lg leading-none">+</span> Nuevo proyecto
           </button>
         </div>
 
@@ -74,7 +74,7 @@ export default function BoardsPanel({ isDark, onToggleTheme, onSelectBoard, onSe
               <span className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xl">📋</span>
               <div>
                 <h3 className="font-bold text-gray-900 dark:text-gray-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">Todas las tareas</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Todo lo tuyo, sin filtro de tablero</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Todo lo tuyo, sin filtro de proyecto</p>
               </div>
             </div>
           </button>
@@ -96,7 +96,7 @@ export default function BoardsPanel({ isDark, onToggleTheme, onSelectBoard, onSe
             className="group flex flex-col items-center justify-center gap-2 min-h-[130px] bg-white dark:bg-gray-900 rounded-2xl border-2 border-dashed border-emerald-300 dark:border-emerald-800 hover:border-emerald-500 dark:hover:border-emerald-500 p-5 transition shadow-sm"
           >
             <span className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl leading-none group-hover:scale-110 transition">+</span>
-            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Nuevo tablero</span>
+            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Nuevo proyecto</span>
           </button>
         </div>
       </main>
@@ -118,13 +118,13 @@ export default function BoardsPanel({ isDark, onToggleTheme, onSelectBoard, onSe
         <ConfirmDialog
           icon="🗑"
           title={`¿Eliminar «${dialog.board.name}»?`}
-          ariaLabel="Confirmar eliminación del tablero"
+          ariaLabel="Confirmar eliminación del proyecto"
           confirmLabel="Eliminar"
           loading={deleting}
           onConfirm={handleDelete}
           onCancel={close}
         >
-          Se eliminará el tablero y <Strong>todas sus tareas</Strong>. Esta acción no se puede deshacer.
+          Se eliminará el proyecto y <Strong>todas sus tareas</Strong>. Esta acción no se puede deshacer.
         </ConfirmDialog>
       )}
 

@@ -20,7 +20,7 @@ export const BOARD_INVITE = {
   getInfo: (token) => invitesApi.getBoardInfo(token),
   accept: (token) => invitesApi.acceptBoard(token),
   successMessage: (info, res) =>
-    info ? `🎉 Te uniste al tablero ${info.boardIcon || ''} «${info.boardName}»` : res.message || '🎉 Te uniste al tablero',
+    info ? `🎉 Te uniste al proyecto ${info.boardIcon || ''} «${info.boardName}»` : res.message || '🎉 Te uniste al proyecto',
   afterAccept: () => {
     refreshBoards();
     reloadTasks().catch(() => {});

@@ -9,8 +9,8 @@ export default function ConfirmClearBoardModal({ boardName, scope = 'board', tas
   return (
     <ConfirmDialog
       icon={isAll ? '🗑️' : '🧹'}
-      title={isAll ? '¿Eliminar todas tus tareas?' : '¿Vaciar el tablero?'}
-      ariaLabel={isAll ? 'Confirmar eliminación de todas las tareas' : 'Confirmar vaciado del tablero'}
+      title={isAll ? '¿Eliminar todas tus tareas?' : '¿Vaciar el proyecto?'}
+      ariaLabel={isAll ? 'Confirmar eliminación de todas las tareas' : 'Confirmar vaciado del proyecto'}
       confirmLabel={isAll ? 'Eliminar todo' : 'Eliminar todas'}
       loading={loading}
       onConfirm={onConfirm}
@@ -24,7 +24,7 @@ export default function ConfirmClearBoardModal({ boardName, scope = 'board', tas
         </>
       ) : (
         <>
-          Se eliminarán <Strong>todas las tareas</Strong> del tablero <Strong>«{boardName}»</Strong>
+          Se eliminarán <Strong>todas las tareas</Strong> del proyecto <Strong>«{boardName}»</Strong>
           {taskCount > 0 && <> ({count})</>}.{' '}
           Esta acción no se puede deshacer.
         </>

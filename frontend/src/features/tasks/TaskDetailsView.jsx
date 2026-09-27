@@ -38,7 +38,7 @@ export default function TaskDetailsView({ task, user, sharedView, userColor, onT
       </div>
 
       <div>
-        <label className={label}>{'\u{1F5C2}'} Tablero</label>
+        <label className={label}>{'\u{1F5C2}'} Proyecto</label>
         <div className="px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg"><BoardBadge board={task.board} /></div>
       </div>
 

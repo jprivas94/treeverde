@@ -60,24 +60,24 @@ export default function InviteBoardModal({ board, onClose, onMembersChanged }) {
   return (
     <Modal onClose={onClose}>
       <ModalHeader
-        title="Invitar al tablero"
+        title="Invitar al proyecto"
         onClose={onClose}
         className="flex items-center justify-between mb-1 px-5 sm:px-6 pt-5"
         titleClassName="text-base font-bold text-gray-900 dark:text-gray-100"
       />
       <p className="text-xs text-gray-500 dark:text-gray-400 px-5 sm:px-6 pb-4">
         Quien abra el enlace quedará como <strong>miembro de «{board.name}»</strong> y solo podrá
-        ver y trabajar dentro de este tablero. Sus demás tareas siguen siendo privadas.
+        ver y trabajar dentro de este proyecto. Sus demás tareas siguen siendo privadas.
       </p>
 
       <div className="px-5 sm:px-6 pb-6 space-y-5">
         {!isOwner ? (
           <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5">
-            Solo el dueño del tablero puede generar enlaces de invitación.
+            Solo el dueño del proyecto puede generar enlaces de invitación.
           </p>
         ) : inviteUrl ? (
           <>
-            <CopyLinkField url={inviteUrl} ariaLabel="Enlace de invitación al tablero" />
+            <CopyLinkField url={inviteUrl} ariaLabel="Enlace de invitación al proyecto" />
             <button
               type="button"
               onClick={handleGenerate}
@@ -122,7 +122,7 @@ export default function InviteBoardModal({ board, onClose, onMembersChanged }) {
                       onClick={() => handleRemoveMember(m.id)}
                       disabled={removingId === m.id}
                       className="text-[10px] font-semibold text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 transition shrink-0"
-                      title="Quitar del tablero"
+                      title="Quitar del proyecto"
                     >
                       {removingId === m.id ? 'Quitando…' : 'Quitar'}
                     </button>

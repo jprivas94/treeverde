@@ -26,7 +26,7 @@ export default function BoardHeader({
             ? 'text-white bg-white/20 hover:bg-white/35'
             : 'text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
         }`}
-        title="Volver a mis tableros"
+        title="Volver a mis proyectos"
       >
         {showHistory ? 'Historial' : activeBoard ? (
           <>
@@ -44,7 +44,7 @@ export default function BoardHeader({
           onClick={onInvite}
           className="hidden md:flex items-center -space-x-1.5 cursor-pointer hover:opacity-90 transition pl-1 py-0.5 focus:outline-none"
           title={`Ver miembros e invitar a ${activeBoard.name}`}
-          aria-label={`Ver miembros del tablero ${activeBoard.name}`}
+          aria-label={`Ver miembros del proyecto ${activeBoard.name}`}
         >
           {activeBoard.members.slice(0, 3).map((m) => (
             <Avatar key={m.id} user={m} sizeClass="w-6 h-6 text-[9px] ring-2 ring-white/30" fallbackClass="bg-white/20 text-white" />
@@ -62,7 +62,7 @@ export default function BoardHeader({
   const right = (
     <>
       {activeBoard && !showHistory && (
-        <HeaderGhostButton onColor data-testid="invite-board-button" onClick={onInvite} title={`Invitar al tablero ${activeBoard.name}`}>
+        <HeaderGhostButton onColor data-testid="invite-board-button" onClick={onInvite} title={`Invitar al proyecto ${activeBoard.name}`}>
           <span aria-hidden="true">👥</span>
           <span className="hidden sm:inline">Invitar</span>
         </HeaderGhostButton>
@@ -81,9 +81,16 @@ export default function BoardHeader({
         </HeaderGhostButton>
       )}
 
-      <button onClick={onBackToBoards} className={`${btn} ${onColor ? 'text-white bg-white/15 hover:bg-white/30' : greyBtn}`}>
-        <span className="sm:hidden">🏠</span>
-        <span className="hidden sm:inline">🗂 Mis tableros</span>
+      {/* Mis Proyectos: vuelve a la lista de proyectos (tablero e historial) */}
+      <button
+        onClick={onBackToBoards}
+        data-testid="my-projects-button"
+        title="Ir a la lista de proyectos"
+        aria-label="Mis Proyectos"
+        className={`${btn} ${onColor ? 'text-white bg-white/15 hover:bg-white/30' : greyBtn}`}
+      >
+        <span className="sm:hidden">🗂</span>
+        <span className="hidden sm:inline">🗂 Mis Proyectos</span>
       </button>
 
       <button onClick={onToggleHistory} className={`${btn} ${showHistory ? greyBtn : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}>

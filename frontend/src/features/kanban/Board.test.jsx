@@ -297,7 +297,7 @@ test('Board: muestra boton Invitar en header cuando hay un tablero activo y abre
   fireEvent.click(inviteBtn);
 
   // Se abre el modal de invitar al tablero
-  const modalTitle = await findByText('Invitar al tablero');
+  const modalTitle = await findByText('Invitar al proyecto');
   assert.ok(modalTitle, 'debe abrir el modal de invitar al tablero');
 });
 
@@ -325,7 +325,7 @@ test('Board: boton Vaciar abre el modal de confirmacion con el nombre del tabler
 
   fireEvent.click(getByTestId('clear-board-button'));
 
-  const modalTitle = await findByText('¿Vaciar el tablero?');
+  const modalTitle = await findByText('¿Vaciar el proyecto?');
   assert.ok(modalTitle, 'debe abrir el modal de confirmación de vaciado');
   findByText('Tablero Vaciable');
 });
@@ -339,7 +339,7 @@ test('Board: cancelar el vaciado no elimina nada', async () => {
   const { getByTestId, findByText, getByText } = renderBoard();
 
   fireEvent.click(getByTestId('clear-board-button'));
-  await findByText('¿Vaciar el tablero?');
+  await findByText('¿Vaciar el proyecto?');
   fireEvent.click(getByText('Cancelar'));
 
   await waitFor(() => assert.equal(useKanbanStore.getState().tasks.some((t) => t.id === 't1'), true, 'la tarea sigue en el store'));
@@ -359,7 +359,7 @@ test('Board: confirmar el vaciado elimina todas las tareas visibles', async () =
   const { getByTestId, findByText, getByText } = renderBoard();
 
   fireEvent.click(getByTestId('clear-board-button'));
-  await findByText('¿Vaciar el tablero?');
+  await findByText('¿Vaciar el proyecto?');
   fireEvent.click(getByText('Eliminar todas'));
 
   await waitFor(() => assert.equal(useKanbanStore.getState().tasks.length, 0, 'el store queda sin tareas'));
@@ -442,7 +442,7 @@ test('Board: en Todas las tareas cada tarjeta muestra su tablero (o Personal)', 
   });
   const { getByText, getByTitle } = renderBoard();
   getByText('Proyecto Alpha');
-  getByTitle('Tablero: Proyecto Alpha');
+  getByTitle('Proyecto: Proyecto Alpha');
   getByText('Personal');
 });
 
@@ -453,6 +453,21 @@ test('Board: con un tablero activo las tarjetas no repiten el tablero', () => {
     tasks: [makeTask('t1', 'A', 'TODO', { board: { id: 'b1', name: 'Tablero Vaciable', color: 'emerald', icon: '🚀' } })],
   });
   const { queryByTitle, queryByText } = renderBoard();
-  assert.equal(queryByTitle('Tablero: Tablero Vaciable'), null, 'sin etiqueta de tablero en la tarjeta');
+  assert.equal(queryByTitle('Proyecto: Tablero Vaciable'), null, 'sin etiqueta de tablero en la tarjeta');
   assert.equal(queryByText('Personal'), null);
+});
+
+// ─── Botón "Mis Proyectos" en el header ─────────────────────────────
+
+test('Board: el boton Mis Proyectos vuelve a la lista de proyectos (tablero e historial)', () => {
+  seedStore({ boards: [], activeBoardId: null });
+  let back = 0;
+  const { getByTestId, getByText, getByRole } = renderBoard({ onBackToBoards: () => { back++; } });
+  getByText('🗂 Mis Proyectos');
+  fireEvent.click(getByTestId('my-projects-button'));
+  assert.equal(back, 1);
+
+  fireEvent.click(getByRole('button', { name: /Historial/ }));
+  fireEvent.click(getByTestId('my-projects-button'));
+  assert.equal(back, 2, 'también disponible desde el Historial');
 });

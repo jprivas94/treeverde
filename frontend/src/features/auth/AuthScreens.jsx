@@ -36,7 +36,7 @@ export default function AuthScreens({ taskInvite, boardInvite }) {
     boardInvite.invalid
       ? { error: true, text: 'El enlace de invitación no es válido' }
       : boardInvite.info && {
-        text: `${boardInvite.info.boardIcon || '🗂'} ${boardInvite.info.ownerName || 'Alguien'} te invita a unirte al tablero «${boardInvite.info.boardName}»`,
+        text: `${boardInvite.info.boardIcon || '🗂'} ${boardInvite.info.ownerName || 'Alguien'} te invita a unirte al proyecto «${boardInvite.info.boardName}»`,
       }
   );
   if (!banner) return screen;
