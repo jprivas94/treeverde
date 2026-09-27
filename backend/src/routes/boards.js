@@ -255,6 +255,42 @@ router.delete('/:id/members/:userId', async (req, res) => {
   }
 });
 
+// ─── DELETE /api/boards/:id/tasks — vaciar el tablero (solo miembros) ──
+// Elimina TODAS las tareas visibles para el usuario dentro del tablero:
+// las que creó, las que tiene asignadas y las compartidas con él.
+// Las tareas de otros miembros sin relación con el usuario permanecen.
+// Usa deleteMany con el mismo criterio de visibilidad que GET /api/tasks?boardId=.
+router.delete('/:id/tasks', async (req, res) => {
+  try {
+    const board = await prisma.board.findUnique({
+      where: { id: req.params.id },
+      include: { members: { select: { userId: true } } }
+    });
+    if (!board) {
+      return res.status(404).json({ error: 'Tablero no encontrado' });
+    }
+    if (!board.members.some((m) => m.userId === req.userId)) {
+      return res.status(403).json({ error: 'No tienes acceso a este tablero' });
+    }
+
+    const result = await prisma.task.deleteMany({
+      where: {
+        boardId: board.id,
+        OR: [
+          { creatorId: req.userId },
+          { assigneeId: req.userId },
+          { shares: { some: { userId: req.userId } } }
+        ]
+      }
+    });
+    logger.info('Tablero vaciado', { userId: req.userId, boardId: board.id, deleted: result.count });
+    res.json({ message: 'Tareas eliminadas', deleted: result.count });
+  } catch (err) {
+    logger.error('Error al vaciar el tablero', err, { userId: req.userId, boardId: req.params?.id });
+    res.status(500).json({ error: 'Error al eliminar las tareas del tablero' });
+  }
+});
+
 // ─── DELETE /api/boards/:id — eliminar tablero y sus tareas (dueño) ──
 router.delete('/:id', async (req, res) => {
   try {

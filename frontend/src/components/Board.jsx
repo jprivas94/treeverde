@@ -11,6 +11,7 @@ import logger from '../services/logger';
 import TreeLogo from './TreeLogo';
 import TreeSpinner from './TreeSpinner';
 import Avatar from './Avatar';
+import HeaderGhostButton from './HeaderGhostButton';
 
 // ─── Code-splitting: modales y paneles secundarios se cargan bajo demanda ──
 const CreateTaskModal = lazy(() => import('./CreateTaskModal'));
@@ -22,6 +23,7 @@ const ImageViewModal = lazy(() => import('./ImageViewModal'));
 const EditTaskModal = lazy(() => import('./EditTaskModal'));
 const ConfirmDeleteModal = lazy(() => import('./ConfirmDeleteModal'));
 const InviteBoardModal = lazy(() => import('./InviteBoardModal'));
+const ConfirmClearBoardModal = lazy(() => import('./ConfirmClearBoardModal'));
 
 // Fallback mientras se descarga un chunk diferido
 function ModalLoading() {
@@ -56,11 +58,15 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
   const appendTasks = useKanbanStore((s) => s.appendTasks);
   const updateTaskStatus = useKanbanStore((s) => s.updateTaskStatus);
   const removeTask = useKanbanStore((s) => s.removeTask);
+  const clearAllTasks = useKanbanStore((s) => s.clearAllTasks);
   const archiveTask = useKanbanStore((s) => s.archiveTask);
   const restoreTask = useKanbanStore((s) => s.restoreTask);
   const getColumns = useKanbanStore((s) => s.getColumns);
   const [showModal, setShowModal] = useState(false);
   const [showInviteBoard, setShowInviteBoard] = useState(false);
+  const [showClearBoard, setShowClearBoard] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearScope, setClearScope] = useState('board'); // 'board' | 'all'
   const [editingTask, setEditingTask] = useState(null);
   const [viewingTask, setViewingTask] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -337,6 +343,55 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
     setShowGoodbye(true);
   };
 
+  // ─── Vaciar tablero: elimina todas las tareas visibles del usuario en él ──
+  const handleClearBoard = async () => {
+    if (!activeBoardId) return;
+    setClearing(true);
+    try {
+      const res = await boardsApi.clearTasks(activeBoardId);
+      // El backend solo borra las tareas visibles (creadas/asignadas/compartidas)
+      const deleted = Number(res?.deleted);
+      if (Number.isFinite(deleted) && deleted < tasks.length) {
+        // Borrado parcial: refrescar desde el servidor para no asumir qué quedó
+        const data = await tasksApi.getAll({ limit: TASKS_PAGE_SIZE, ...(activeBoardId ? { boardId: activeBoardId } : {}) });
+        setTasks(data, data.length === TASKS_PAGE_SIZE);
+      } else {
+        // Borrado completo del conjunto visible: limpiar en cliente
+        tasks.forEach((t) => removeTask(t.id));
+      }
+      setShowClearBoard(false);
+    } catch (err) {
+      logger.error('Error al vaciar el tablero', err, { boardId: activeBoardId });
+      setShowClearBoard(false);
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  // ─── Eliminar todas las tareas del usuario (vista "Todas las tareas") ──
+  // El backend preserva archivadas de <2min y nunca toca las compartidas;
+  // usamos el conteo devuelto para refrescar si el borrado fue parcial.
+  const handleClearAllTasks = async () => {
+    setClearing(true);
+    try {
+      const res = await tasksApi.removeAll();
+      const remaining = Number(res?.remaining);
+      if (Number.isFinite(remaining) && remaining > 0) {
+        // Quedaron tareas (protegidas): refrescar desde el servidor
+        const data = await tasksApi.getAll({ limit: TASKS_PAGE_SIZE });
+        setTasks(data, data.length === TASKS_PAGE_SIZE);
+      } else {
+        clearAllTasks();
+      }
+      setShowClearBoard(false);
+    } catch (err) {
+      logger.error('Error al eliminar todas las tareas', err);
+      setShowClearBoard(false);
+    } finally {
+      setClearing(false);
+    }
+  };
+
   // Auto-logout 2 segundos después de mostrar el modal de despedida
   useEffect(() => {
     if (showGoodbye) {
@@ -496,15 +551,29 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
 
           {/* Botón Invitar al tablero (disponible en el header del tablero creado) */}
           {activeBoard && !showHistory && (
-            <button
+            <HeaderGhostButton
+              onColor={Boolean(activeBoard)}
               data-testid="invite-board-button"
               onClick={() => setShowInviteBoard(true)}
-              className="px-2 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition shadow-sm flex items-center gap-1.5 text-white bg-white/20 hover:bg-white/35 border border-white/25 backdrop-blur-xs"
               title={`Invitar al tablero ${activeBoard.name}`}
             >
               <span aria-hidden="true">👥</span>
               <span className="hidden sm:inline">Invitar</span>
-            </button>
+            </HeaderGhostButton>
+          )}
+
+          {/* Botón Vaciar / Eliminar todo: con tablero activo vacía ese tablero;
+              en "Todas las tareas" elimina todas las tareas del usuario */}
+          {!showHistory && (
+            <HeaderGhostButton
+              onColor={Boolean(activeBoard)}
+              data-testid={activeBoard ? 'clear-board-button' : 'clear-all-button'}
+              onClick={() => { setClearScope(activeBoard ? 'board' : 'all'); setShowClearBoard(true); }}
+              title={activeBoard ? `Eliminar todas las tareas de ${activeBoard.name}` : 'Eliminar todas tus tareas'}
+            >
+              <span aria-hidden="true">🧹</span>
+              <span className="hidden sm:inline">Vaciar</span>
+            </HeaderGhostButton>
           )}
 
           {/* Botón Mis tableros */}
@@ -728,6 +797,19 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
             onMembersChanged={() => {
               boardsApi.getAll().then(setBoards).catch(() => {});
             }}
+          />
+        </Suspense>
+      )}
+
+      {showClearBoard && (
+        <Suspense fallback={<ModalLoading />}>
+          <ConfirmClearBoardModal
+            boardName={activeBoard?.name || ''}
+            scope={clearScope}
+            taskCount={clearScope === 'all' ? tasks.length + archivedTasks.length : tasks.length}
+            onConfirm={clearScope === 'all' ? handleClearAllTasks : handleClearBoard}
+            onCancel={() => setShowClearBoard(false)}
+            loading={clearing}
           />
         </Suspense>
       )}

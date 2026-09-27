@@ -141,6 +141,11 @@ const useKanbanStore = create((set, get) => ({
       archivedTasks: s.archivedTasks.filter((t) => t.id !== taskId),
     })),
 
+  // Vaciar "Todas las tareas": elimina del store todas las tareas visibles
+  // (activas y archivadas). El backend ya resolvió qué podía borrar.
+  clearAllTasks: () =>
+    set({ tasks: [], archivedTasks: [] }),
+
   // Insertar o actualizar una tarea (usado por realtime: llegan eventos
   // INSERT/UPDATE de tareas creadas/cambiadas por otros usuarios).
   upsertTask: (task) =>

@@ -1,10 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "prisma generate",
-  "includeFiles": "node_modules/.prisma/client/**",
+  "installCommand": "npm install --ignore-scripts",
+  "buildCommand": "npx prisma generate",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "node_modules/.prisma/client/**"
+    }
+  },
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/(.*)",
       "destination": "/api"
     }
   ]

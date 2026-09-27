@@ -18,14 +18,16 @@ function createFakeDb() {
   let users = [];
   let tasks = [];
   let shares = [];
-  let uid = 0, tid = 0, sid = 0, nid = 0;
+  const boards = [];
+  const boardsOwners = new Map();
+  let uid = 0, tid = 0, sid = 0, nid = 0, bid = 0;
   const notifications = [];
 
   const clone = (o) => (o ? JSON.parse(JSON.stringify(o)) : o);
 
   return {
     _notifications: notifications,
-    reset() { users = []; tasks = []; shares = []; notifications.length = 0; uid = 0; tid = 0; sid = 0; nid = 0; },
+    reset() { users = []; tasks = []; shares = []; notifications.length = 0; uid = 0; tid = 0; sid = 0; nid = 0; boards.length = 0; boardsOwners.clear(); bid = 0; },
     user: {
       async findMany({ where, select, orderBy, take, skip } = {}) {
         let result = [...users];
@@ -118,6 +120,41 @@ function createFakeDb() {
         const i = tasks.findIndex((x) => x.id === where.id);
         if (i === -1) { const e = new Error('not found'); e.code = 'P2025'; throw e; }
         tasks.splice(i, 1);
+      },
+      async deleteMany({ where = {} } = {}) {
+        // Criterio de visibilidad igual que GET /api/tasks: creator, asignado
+        // o compartido; filtrado por boardId si viene. Las condiciones se
+        // combinan con AND (semántica de Prisma).
+        let candidates = tasks;
+        if (where.boardId) candidates = candidates.filter((t) => t.boardId === where.boardId);
+        if (where.creatorId) candidates = candidates.filter((t) => t.creatorId === where.creatorId);
+        if (where.OR) {
+          candidates = candidates.filter((t) =>
+            where.OR.some((cond) =>
+              (cond.creatorId && t.creatorId === cond.creatorId) ||
+              (cond.assigneeId && t.assigneeId === cond.assigneeId) ||
+              (cond.shares?.some?.userId && shares.some((s) => s.taskId === t.id && s.userId === cond.shares.some.userId))
+            )
+          );
+        }
+        const ids = new Set(candidates.map((t) => t.id));
+        tasks = tasks.filter((t) => !ids.has(t.id));
+        return { count: ids.size };
+      },
+      async count({ where = {} } = {}) {
+        // Mismo criterio de visibilidad que findMany (OR creator/asignado/compartido)
+        let result = tasks;
+        if (where && where.OR) {
+          result = tasks.filter((t) =>
+            where.OR.some((cond) =>
+              (cond.creatorId && t.creatorId === cond.creatorId) ||
+              (cond.assigneeId && t.assigneeId === cond.assigneeId) ||
+              (cond.shares && cond.shares.some?.userId &&
+                shares.some((s) => s.taskId === t.id && s.userId === cond.shares.some.userId))
+            )
+          );
+        }
+        return result.length;
       }
     },
     taskShare: {
@@ -147,6 +184,50 @@ function createFakeDb() {
         const before = shares.length;
         shares = shares.filter((x) => !(x.taskId === where.taskId && x.userId === where.userId));
         return { count: before - shares.length };
+      }
+    },
+    board: {
+      async findUnique({ where }) {
+        const b = boards.find((x) => {
+          if (where.id) return x.id === where.id;
+          if (where.inviteToken) return x.inviteToken === where.inviteToken;
+          return false;
+        });
+        return b ? clone(b) : null;
+      },
+      async create({ data, include }) {
+        const b = { id: `b${++bid}`, name: 'Tablero', description: '', color: 'emerald', icon: '🗂', inviteToken: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...data };
+        if (data.members?.create) {
+          b.members = [{ boardId: b.id, userId: data.members.create.userId, role: data.members.create.role || 'member' }];
+        }
+        if (data.ownerId) {
+          boardsOwners.set(b.id, data.ownerId);
+        }
+        boards.push(b);
+        // Respetar el include real: devolver el board con members y _count
+        void include;
+        return clone({ ...b, members: b.members || [], _count: { tasks: 0 } });
+      },
+      async update({ where, data }) {
+        const b = boards.find((x) => x.id === where.id);
+        if (!b) { const e = new Error('not found'); e.code = 'P2025'; throw e; }
+        Object.assign(b, data);
+        return clone({ ...b, members: b.members || [], _count: { tasks: 0 } });
+      },
+      async delete({ where }) {
+        const i = boards.findIndex((x) => x.id === where.id);
+        if (i === -1) { const e = new Error('not found'); e.code = 'P2025'; throw e; }
+        boards.splice(i, 1);
+        boardsOwners.delete(where.id);
+      }
+    },
+    boardMember: {
+      async create({ data }) {
+        const b = boards.find((x) => x.id === data.boardId);
+        if (!b) { const e = new Error('not found'); e.code = 'P2025'; throw e; }
+        b.members = b.members || [];
+        b.members.push({ boardId: b.id, userId: data.userId, role: data.role || 'member' });
+        return clone({ ...data, createdAt: new Date().toISOString() });
       }
     },
     notification: {
@@ -1206,5 +1287,140 @@ test('POST /api/invites/:token/accept → 404 con token inválido', async () => 
 
 test('POST /api/invites/:token/accept → 401 sin token', async () => {
   const res = await api.post('/api/invites/xxx/accept');
+  assert.equal(res.status, 401);
+});
+
+// ═══════════════ VACIAR TABLERO (DELETE /api/boards/:id/tasks) ═══════════════
+
+// Helper: crea un tablero vía API real (usa el fake de prisma.board.create)
+async function createBoard(token, name = 'Tablero Test') {
+  const res = await api.post('/api/boards')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name });
+  return res;
+}
+
+async function createTaskInBoard(token, boardId, title = 'Tarea en tablero') {
+  return createTask(token, { title, boardId });
+}
+
+test('DELETE /api/boards/:id/tasks → vacía el tablero del usuario', async () => {
+  const owner = await register('Vaciar Owner', 'vaciarowner@test.com');
+  const board = await createBoard(owner.body.token);
+  await createTaskInBoard(owner.body.token, board.body.id, 'Tarea A');
+  await createTaskInBoard(owner.body.token, board.body.id, 'Tarea B');
+  // Tarea fuera del tablero: NO debe eliminarse
+  await createTask(owner.body.token, { title: 'Personal' });
+
+  const res = await api.delete(`/api/boards/${board.body.id}/tasks`)
+    .set('Authorization', `Bearer ${owner.body.token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.deleted, 2);
+
+  const list = await api.get('/api/tasks').set('Authorization', `Bearer ${owner.body.token}`);
+  const titles = list.body.map((t) => t.title);
+  assert.ok(!titles.includes('Tarea A'), 'Tarea A eliminada');
+  assert.ok(!titles.includes('Tarea B'), 'Tarea B eliminada');
+  assert.ok(titles.includes('Personal'), 'la tarea personal permanece');
+});
+
+test('DELETE /api/boards/:id/tasks → 404 si el tablero no existe', async () => {
+  const user = await register('Vaciar 404', 'vaciar404@test.com');
+  const res = await api.delete('/api/boards/bnoexiste/tasks')
+    .set('Authorization', `Bearer ${user.body.token}`);
+  assert.equal(res.status, 404);
+});
+
+test('DELETE /api/boards/:id/tasks → 403 para quien no es miembro', async () => {
+  const owner = await register('Vaciar Owner2', 'vaciarowner2@test.com');
+  const outsider = await register('Vaciar Outside', 'vaciaroutside@test.com');
+  const board = await createBoard(owner.body.token);
+
+  const res = await api.delete(`/api/boards/${board.body.id}/tasks`)
+    .set('Authorization', `Bearer ${outsider.body.token}`);
+  assert.equal(res.status, 403);
+});
+
+test('DELETE /api/boards/:id/tasks → respeta la privacidad de otros miembros', async () => {
+  const owner = await register('Vaciar Owner3', 'vaciarowner3@test.com');
+  const member = await register('Vaciar Member', 'vaciarmember@test.com');
+  const board = await createBoard(owner.body.token);
+  // Agregar al miembro vía enlace de invitación de tablero
+  const inv = await api.post(`/api/boards/${board.body.id}/invite`)
+    .set('Authorization', `Bearer ${owner.body.token}`);
+  const invToken = inv.body.inviteUrl.split('boardInvite=')[1];
+  await api.post(`/api/invites/board/${invToken}/accept`)
+    .set('Authorization', `Bearer ${member.body.token}`);
+
+  // Tareas del owner y del member en el mismo tablero
+  await createTaskInBoard(owner.body.token, board.body.id, 'Del owner');
+  await createTaskInBoard(member.body.token, board.body.id, 'Del member');
+
+  // El owner vacía: solo elimina las suyas (visibles para él)
+  const res = await api.delete(`/api/boards/${board.body.id}/tasks`)
+    .set('Authorization', `Bearer ${owner.body.token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.deleted, 1, 'solo la tarea del owner es eliminada');
+
+  // La tarea del member sigue existiendo (visible para él)
+  const memberList = await api.get(`/api/tasks?boardId=${board.body.id}`)
+    .set('Authorization', `Bearer ${member.body.token}`);
+  assert.equal(memberList.body.length, 1);
+  assert.equal(memberList.body[0].title, 'Del member');
+});
+
+test('DELETE /api/boards/:id/tasks → 401 sin autenticación', async () => {
+  const res = await api.delete('/api/boards/b1/tasks');
+  assert.equal(res.status, 401);
+});
+
+// ═══════════ DELETE /api/tasks/all — eliminar todas las tareas ═══════════
+
+test('DELETE /api/tasks/all → elimina todas las tareas creadas por el usuario', async () => {
+  const owner = await register('All Owner', 'allowner@test.com');
+  const board = await createBoard(owner.body.token);
+  await createTask(owner.body.token, { title: 'Personal 1' });
+  await createTaskInBoard(owner.body.token, board.body.id, 'En tablero');
+
+  const res = await api.delete('/api/tasks/all')
+    .set('Authorization', `Bearer ${owner.body.token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.deleted, 2);
+  assert.equal(res.body.remaining, 0);
+
+  const list = await api.get('/api/tasks').set('Authorization', `Bearer ${owner.body.token}`);
+  assert.equal(list.body.length, 0);
+});
+
+test('DELETE /api/tasks/all → no toca tareas de otros (asignadas ni compartidas)', async () => {
+  const owner = await register('All Owner2', 'allowner2@test.com');
+  const other = await register('All Other', 'allother@test.com');
+
+  // Otra persona asigna una tarea a owner y le comparte otra
+  const t1 = await createTask(other.body.token, { title: 'Asignada a owner', assigneeId: owner.body.user.id });
+  const t2 = await createTask(other.body.token, { title: 'Compartida con owner' });
+  await api.post(`/api/tasks/${t2.body.id}/share`)
+    .set('Authorization', `Bearer ${other.body.token}`)
+    .send({ userId: owner.body.user.id });
+
+  // Owner crea las suyas
+  await createTask(owner.body.token, { title: 'Mía 1' });
+
+  const res = await api.delete('/api/tasks/all')
+    .set('Authorization', `Bearer ${owner.body.token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.deleted, 1, 'solo la propia');
+  assert.equal(res.body.remaining, 2, 'asignada y compartida siguen visibles');
+
+  const list = await api.get('/api/tasks').set('Authorization', `Bearer ${owner.body.token}`);
+  const titles = list.body.map((t) => t.title);
+  assert.ok(titles.includes('Asignada a owner'));
+  assert.ok(titles.includes('Compartida con owner'));
+  assert.ok(!titles.includes('Mía 1'));
+  void t1;
+});
+
+test('DELETE /api/tasks/all → 401 sin autenticación', async () => {
+  const res = await api.delete('/api/tasks/all');
   assert.equal(res.status, 401);
 });

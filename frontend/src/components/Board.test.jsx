@@ -301,3 +301,130 @@ test('Board: muestra boton Invitar en header cuando hay un tablero activo y abre
   assert.ok(modalTitle, 'debe abrir el modal de invitar al tablero');
 });
 
+// ─── Vaciar tablero ──────────────────────────────────
+const CLEAR_BOARD = {
+  id: 'b1',
+  name: 'Tablero Vaciable',
+  color: 'emerald',
+  icon: '🚀',
+  ownerId: USER.id,
+  members: [{ ...USER, role: 'owner' }]
+};
+
+test('Board: sin tablero activo muestra Vaciar (todo) pero no Vaciar (tablero)', () => {
+  // El store es global entre tests: limpiar boards/activeBoardId explicitamente
+  seedStore({ boards: [], activeBoardId: null });
+  const { getByTestId, queryByTestId } = renderBoard();
+  assert.ok(getByTestId('clear-all-button'), 'botón de eliminar todo presente en la vista general');
+  assert.equal(queryByTestId('clear-board-button'), null, 'sin tablero activo no existe el botón de vaciar tablero');
+});
+
+test('Board: boton Vaciar abre el modal de confirmacion con el nombre del tablero', async () => {
+  seedStore({ boards: [CLEAR_BOARD], activeBoardId: 'b1', tasks: [makeTask('t1', 'A', 'TODO')] });
+  const { getByTestId, findByText } = renderBoard();
+
+  fireEvent.click(getByTestId('clear-board-button'));
+
+  const modalTitle = await findByText('¿Vaciar el tablero?');
+  assert.ok(modalTitle, 'debe abrir el modal de confirmación de vaciado');
+  findByText('Tablero Vaciable');
+});
+
+test('Board: cancelar el vaciado no elimina nada', async () => {
+  seedStore({ boards: [CLEAR_BOARD], activeBoardId: 'b1', tasks: [makeTask('t1', 'A', 'TODO')] });
+  const calls = stubFetch([
+    ...defaultHandlers(),
+    { method: 'DELETE', path: '/boards/b1/tasks', body: { message: 'Tareas eliminadas', deleted: 1 } },
+  ]);
+  const { getByTestId, findByText, getByText } = renderBoard();
+
+  fireEvent.click(getByTestId('clear-board-button'));
+  await findByText('¿Vaciar el tablero?');
+  fireEvent.click(getByText('Cancelar'));
+
+  await waitFor(() => assert.equal(useKanbanStore.getState().tasks.some((t) => t.id === 't1'), true, 'la tarea sigue en el store'));
+  assert.equal(findCall(calls, 'DELETE', '/boards/b1/tasks'), undefined, 'no debe llamarse DELETE al cancelar');
+});
+
+test('Board: confirmar el vaciado elimina todas las tareas visibles', async () => {
+  seedStore({
+    boards: [CLEAR_BOARD],
+    activeBoardId: 'b1',
+    tasks: [makeTask('t1', 'A', 'TODO'), makeTask('t2', 'B', 'IN_PROGRESS')],
+  });
+  const calls = stubFetch([
+    ...defaultHandlers(),
+    { method: 'DELETE', path: '/boards/b1/tasks', body: { message: 'Tareas eliminadas', deleted: 2 } },
+  ]);
+  const { getByTestId, findByText, getByText } = renderBoard();
+
+  fireEvent.click(getByTestId('clear-board-button'));
+  await findByText('¿Vaciar el tablero?');
+  fireEvent.click(getByText('Eliminar todas'));
+
+  await waitFor(() => assert.equal(useKanbanStore.getState().tasks.length, 0, 'el store queda sin tareas'));
+  assert.ok(findCall(calls, 'DELETE', '/boards/b1/tasks'), 'debe llamarse DELETE /boards/:id/tasks');
+});
+
+test('Board: el boton Vaciar desaparece en la vista Historial', () => {
+  seedStore({ boards: [CLEAR_BOARD], activeBoardId: 'b1' });
+  const { queryByTestId, getByText } = renderBoard();
+  fireEvent.click(getByText('📊 Historial'));
+  assert.equal(queryByTestId('clear-board-button'), null, 'sin boton Vaciar en Historial');
+});
+
+// ─── Eliminar todas las tareas (vista "Todas las tareas") ──────────
+
+test('Board: en Todas las tareas el modal pide confirmar eliminar todo', async () => {
+  seedStore({ boards: [], activeBoardId: null, tasks: [makeTask('t1', 'A', 'TODO')] });
+  const { getByTestId, findByText } = renderBoard();
+
+  fireEvent.click(getByTestId('clear-all-button'));
+
+  const modalTitle = await findByText('¿Eliminar todas tus tareas?');
+  assert.ok(modalTitle, 'debe abrir el modal de eliminar todas las tareas');
+});
+
+test('Board: confirmar eliminar todo llama DELETE /tasks/all y limpia el store', async () => {
+  seedStore({
+    boards: [],
+    activeBoardId: null,
+    tasks: [makeTask('t1', 'A', 'TODO'), makeTask('t2', 'B', 'IN_PROGRESS')],
+    archivedTasks: [makeTask('t3', 'C', 'ARCHIVED')],
+  });
+  const calls = stubFetch([
+    ...defaultHandlers(),
+    { method: 'DELETE', path: '/tasks/all', body: { message: 'Tareas eliminadas', deleted: 3, remaining: 0 } },
+  ]);
+  const { getByTestId, findByText, getByText } = renderBoard();
+
+  fireEvent.click(getByTestId('clear-all-button'));
+  await findByText('¿Eliminar todas tus tareas?');
+  fireEvent.click(getByText('Eliminar todo'));
+
+  await waitFor(() => {
+    const s = useKanbanStore.getState();
+    assert.equal(s.tasks.length, 0, 'sin tareas activas');
+    assert.equal(s.archivedTasks.length, 0, 'sin tareas archivadas');
+  });
+  assert.ok(findCall(calls, 'DELETE', '/tasks/all'), 'debe llamarse DELETE /tasks/all');
+});
+
+// ─── Color de letra del botón Vaciar según el fondo (onColor) ──────
+
+test('Board: sobre header blanco el boton Vaciar usa letra oscura', () => {
+  seedStore({ boards: [], activeBoardId: null });
+  const { getByTestId } = renderBoard();
+  const btn = getByTestId('clear-all-button');
+  assert.ok(btn.className.includes('text-gray-900'), `letra oscura sobre fondo blanco (clases: ${btn.className})`);
+  assert.ok(!btn.className.includes('text-white'), 'no debe llevar letra blanca sobre blanco');
+});
+
+test('Board: sobre el gradiente del tablero activo el boton Vaciar usa letra blanca', () => {
+  seedStore({ boards: [CLEAR_BOARD], activeBoardId: 'b1' });
+  const { getByTestId } = renderBoard();
+  const btn = getByTestId('clear-board-button');
+  assert.ok(btn.className.includes('text-white'), `letra blanca sobre el gradiente (clases: ${btn.className})`);
+  assert.ok(btn.className.includes('bg-white/20'), 'fondo translúcido sobre el gradiente');
+});
+

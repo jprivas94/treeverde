@@ -1,0 +1,6 @@
+# No subir secretos locales: en runtime, dotenv (override:true) los cargaria
+# y sobrescribiria las env vars de produccion configuradas en Vercel
+.env
+.env.*
+node_modules
+tests

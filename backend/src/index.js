@@ -76,12 +76,25 @@ export default app;
 
 // Solo escuchar si NO estamos en Vercel (desarrollo local)
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     logger.info(`Servidor iniciado en http://localhost:${PORT}`);
     logger.info(`Entorno: ${process.env.NODE_ENV || 'development'}`);
     if (!process.env.CLOUDINARY_CLOUD_NAME) {
       logger.warn('Cloudinary no configurado — subida de imágenes deshabilitada');
     }
+  });
+
+  // Mensaje accionable en vez de stack trace cuando el puerto ya está
+  // ocupado (típico: quedó un backend anterior corriendo o huérfano).
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.error(`El puerto ${PORT} ya está en uso — probablemente hay otro backend corriendo.`);
+      logger.error('Detén ese proceso y vuelve a intentar:');
+      logger.error(`  netstat -ano | findstr :${PORT}   →   taskkill /F /PID <pid> /T`);
+      process.exit(1);
+      return;
+    }
+    throw err;
   });
 }
 

@@ -157,6 +157,8 @@ export const tasksApi = {
   unshare: (id, userId) =>
     request(`/tasks/${id}/share/${userId}`, { method: 'DELETE' }),
   remove: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
+  // Elimina TODAS las tareas visibles del usuario (personales + de todos los tableros)
+  removeAll: () => request('/tasks/all', { method: 'DELETE' }),
   // Genera (o regenera) el enlace de invitación de una tarea.
   // role 'assignee' → quien lo acepte queda como asignado (URL de creación).
   // role 'share'    → quien lo acepte queda como compartido (URL de edición).
@@ -187,7 +189,9 @@ export const boardsApi = {
     request(`/boards/${id}/invite`, { method: 'POST' }),
   // Quita un miembro del tablero (solo dueño)
   removeMember: (id, userId) =>
-    request(`/boards/${id}/members/${userId}`, { method: 'DELETE' })
+    request(`/boards/${id}/members/${userId}`, { method: 'DELETE' }),
+  // Vaciar el tablero: elimina todas las tareas visibles del usuario en él
+  clearTasks: (id) => request(`/boards/${id}/tasks`, { method: 'DELETE' })
 };
 
 // ─── Invitaciones por URL ─────────────────────

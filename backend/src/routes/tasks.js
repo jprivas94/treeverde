@@ -76,6 +76,32 @@ router.get('/', async (req, res) => {
   }
 });
 
+// DELETE /api/tasks/all — eliminar TODAS las tareas que el usuario CREÓ
+// (personales y las de cualquier tablero, activas o archivadas).
+// Misma regla de permisos que DELETE /api/tasks/:id: solo el creador puede
+// eliminar. Las tareas asignadas por otros o compartidas con el usuario
+// NO se tocan (él no puede eliminarlas individualmente tampoco).
+router.delete('/all', async (req, res) => {
+  try {
+    const result = await prisma.task.deleteMany({ where: { creatorId: req.userId } });
+    // Cuántas tareas sigue viendo el usuario (asignadas/compartidas quedan)
+    const remaining = await prisma.task.count({
+      where: {
+        OR: [
+          { creatorId: req.userId },
+          { assigneeId: req.userId },
+          { shares: { some: { userId: req.userId } } }
+        ]
+      }
+    });
+    logger.info('Tareas eliminadas en bloque', { userId: req.userId, deleted: result.count, remaining });
+    res.json({ message: 'Tareas eliminadas', deleted: result.count, remaining });
+  } catch (err) {
+    logger.error('Error al eliminar todas las tareas', err, { userId: req.userId });
+    res.status(500).json({ error: 'Error al eliminar las tareas' });
+  }
+});
+
 // GET /api/tasks/:id — obtener una tarea concreta (incluye shares)
 router.get('/:id', async (req, res) => {
   try {
