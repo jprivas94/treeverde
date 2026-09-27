@@ -115,6 +115,7 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
                         onDeleteTask={actions.requestDelete}
                         canDeleteForTask={(task) => isCreator(task, user)}
                         isSharedUserForTask={(task) => isSharedUser(task, user)}
+                        showBoard={!activeBoard}
                         fixedHeight={column.id !== 'TODO' ? layout.referenceHeight : undefined}
                         todoRef={column.id === 'TODO' ? layout.todoColumnRef : undefined}
                       />

@@ -428,3 +428,31 @@ test('Board: sobre el gradiente del tablero activo el boton Vaciar usa letra bla
   assert.ok(btn.className.includes('bg-white/20'), 'fondo translúcido sobre el gradiente');
 });
 
+
+// ─── Tablero de origen en "Todas las tareas" ────────────────────────
+
+test('Board: en Todas las tareas cada tarjeta muestra su tablero (o Personal)', () => {
+  seedStore({
+    boards: [],
+    activeBoardId: null,
+    tasks: [
+      makeTask('t1', 'Tarea de proyecto', 'TODO', { board: { id: 'b9', name: 'Proyecto Alpha', color: 'blue', icon: '🚀' } }),
+      makeTask('t2', 'Tarea suelta', 'TODO', { board: null }),
+    ],
+  });
+  const { getByText, getByTitle } = renderBoard();
+  getByText('Proyecto Alpha');
+  getByTitle('Tablero: Proyecto Alpha');
+  getByText('Personal');
+});
+
+test('Board: con un tablero activo las tarjetas no repiten el tablero', () => {
+  seedStore({
+    boards: [CLEAR_BOARD],
+    activeBoardId: 'b1',
+    tasks: [makeTask('t1', 'A', 'TODO', { board: { id: 'b1', name: 'Tablero Vaciable', color: 'emerald', icon: '🚀' } })],
+  });
+  const { queryByTitle, queryByText } = renderBoard();
+  assert.equal(queryByTitle('Tablero: Tablero Vaciable'), null, 'sin etiqueta de tablero en la tarjeta');
+  assert.equal(queryByText('Personal'), null);
+});

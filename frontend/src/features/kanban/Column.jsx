@@ -2,7 +2,7 @@ import { Droppable } from '@hello-pangea/dnd';
 import TaskCard from './TaskCard';
 import { getStatusConfig } from '../../shared/constants/kanbanConfig';
 
-export default function Column({ column, onEditTask, onMoveTask, onViewImage, onDeleteTask, canDeleteForTask, fixedHeight, todoRef, isSharedUserForTask }) {
+export default function Column({ column, onEditTask, onMoveTask, onViewImage, onDeleteTask, canDeleteForTask, fixedHeight, todoRef, isSharedUserForTask, showBoard }) {
   const colors = getStatusConfig(column.id);
 
   return (
@@ -43,7 +43,7 @@ export default function Column({ column, onEditTask, onMoveTask, onViewImage, on
               </div>
             )}
             {column.tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} onViewImage={onViewImage} onDelete={canDeleteForTask?.(task) ? onDeleteTask : undefined} isSharedUser={isSharedUserForTask?.(task)} />
+              <TaskCard key={task.id} task={task} index={index} onEdit={onEditTask} onMove={onMoveTask} onViewImage={onViewImage} onDelete={canDeleteForTask?.(task) ? onDeleteTask : undefined} isSharedUser={isSharedUserForTask?.(task)} showBoard={showBoard} />
             ))}
             {provided.placeholder}
           </div>

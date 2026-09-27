@@ -6,6 +6,7 @@ import { getCloudinaryThumb } from '../../shared/utils/images';
 import { parseSubtasks, getTaskImages } from '../../shared/utils/tasks';
 import { formatDateShort, isOverdue } from '../../shared/utils/date';
 import Avatar from '../../shared/ui/Avatar';
+import BoardBadge from '../boards/BoardBadge';
 
 const MAX_THUMBS = 2;
 const hoverReveal = 'sm:opacity-0 sm:group-hover/card:opacity-100';
@@ -13,7 +14,7 @@ const hoverReveal = 'sm:opacity-0 sm:group-hover/card:opacity-100';
 // ─── TaskCard ─────────────────────────────────────────────────────────
 // Tarjeta arrastrable de una tarea: estado, prioridad, descripción, progreso
 // de subtareas, imágenes, etiquetas, personas, fecha y botones para moverla.
-export default function TaskCard({ task, index, onEdit, onMove, onViewImage, onDelete, isSharedUser }) {
+export default function TaskCard({ task, index, onEdit, onMove, onViewImage, onDelete, isSharedUser, showBoard = false }) {
   const priority = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.MEDIUM;
   const dueDateStr = formatDateShort(task.dueDate);
   const overdue = isOverdue(task.dueDate);
@@ -56,6 +57,9 @@ export default function TaskCard({ task, index, onEdit, onMove, onViewImage, onD
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${priority.class}`}>{priority.label}</span>
             </div>
           </div>
+
+          {/* En "Todas las tareas": tablero (proyecto) al que pertenece */}
+          {showBoard && <div className="mb-1.5"><BoardBadge board={task.board} /></div>}
 
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug">{task.title}</h3>
           {task.description && (
