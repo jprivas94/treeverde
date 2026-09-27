@@ -52,9 +52,11 @@ frontend/src/
 |   |   |-- AuthLayout / AuthSkeleton
 |   |   `-- useAuth.js / useSessionRestore.js
 |   |
-|   |-- boards/            Panel "Mis tableros"
+|   |-- boards/            Panel "Mis Proyectos"
 |   |   |-- BoardsPanel.jsx      Pantalla del panel
-|   |   |-- BoardCard.jsx        Tarjeta de un tablero (con su menú ⋯)
+|   |   |-- ProjectsSummary.jsx  Saludo + métricas (pendientes, vencen pronto, terminadas)
+|   |   |-- ProjectRow.jsx       Fila de un proyecto: color, progreso, estado, menú ⋯
+|   |   |-- useProjectsSummary.js Resumen de tareas (GET /api/tasks/summary)
 |   |   |-- BoardFormModal.jsx   Crear / editar tablero
 |   |   |-- InviteBoardModal.jsx Invitar miembros
 |   |   `-- boardService.js      refreshBoards() (API + store)

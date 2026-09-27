@@ -6,6 +6,7 @@ import logger from '../utils/logger.js';
 import { getFrontendUrl } from '../utils/config.js';
 import { safeCreate } from '../utils/notifications.js';
 import { isNonEmptyString, isValidDescription as isStringSafe } from '../utils/validate.js';
+import { summarizeTasks } from '../utils/taskStats.js';
 
 const router = Router();
 
@@ -64,18 +65,19 @@ router.get('/', async (req, res) => {
               { shares: { some: { userId: req.userId } } }
             ]
           },
-          select: { id: true, status: true }
+          select: { id: true, status: true, dueDate: true, updatedAt: true }
         }
       },
       orderBy: { createdAt: 'asc' }
     });
 
-    // Respuesta compacta: conteo total + conteo de pendientes para el panel
+    // Respuesta compacta: conteos + estadísticas (vencidas, próximas, última actividad) para el panel
     res.json(boards.map(({ tasks, members, _count, ...board }) => ({
       ...board,
       taskCount: _count.tasks,
       myTaskCount: tasks.length,
       doneCount: tasks.filter((t) => t.status === 'DONE' || t.status === 'ARCHIVED').length,
+      stats: summarizeTasks(tasks),
       members: members.map((m) => ({ ...m.user, role: m.role }))
     })));
   } catch (err) {

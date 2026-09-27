@@ -7,6 +7,7 @@ import { getFrontendUrl } from '../utils/config.js';
 import { canViewTask, canEditTask, canEditSubtasks, canDeleteTask } from '../utils/permissions.js';
 import { notifyAssigned, notifyCompleted, notifyShared, notifySubtaskCompleted } from '../utils/notifications.js';
 import { parsePagination } from '../utils/pagination.js';
+import { summarizeTasks } from '../utils/taskStats.js';
 import { isValidStatus, isValidSubtasks, validateTaskCreate, validateTaskUpdate } from '../utils/validate.js';
 
 const router = Router();
@@ -73,6 +74,30 @@ router.get('/', async (req, res) => {
   } catch (err) {
     logger.error('Error al obtener tareas', err, { userId: req.userId });
     res.status(500).json({ error: 'Error al obtener tareas' });
+  }
+});
+
+// GET /api/tasks/summary — estadísticas de todas las tareas visibles del usuario
+// (panel de proyectos): pendientes, terminadas, vencidas, próximas y personales.
+router.get('/summary', async (req, res) => {
+  try {
+    const tasks = await prisma.task.findMany({
+      where: {
+        OR: [
+          { creatorId: req.userId },
+          { assigneeId: req.userId },
+          { shares: { some: { userId: req.userId } } }
+        ]
+      },
+      select: { id: true, status: true, dueDate: true, updatedAt: true, boardId: true }
+    });
+    res.json({
+      ...summarizeTasks(tasks),
+      personal: tasks.filter((task) => !task.boardId).length
+    });
+  } catch (err) {
+    logger.error('Error al obtener el resumen de tareas', err, { userId: req.userId });
+    res.status(500).json({ error: 'Error al obtener el resumen de tareas' });
   }
 });
 

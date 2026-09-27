@@ -1424,3 +1424,30 @@ test('DELETE /api/tasks/all → 401 sin autenticación', async () => {
   const res = await api.delete('/api/tasks/all');
   assert.equal(res.status, 401);
 });
+
+// ═══════════════ RESUMEN (GET /api/tasks/summary) ═══════════════
+
+test('GET /api/tasks/summary → estadísticas de las tareas visibles del usuario', async () => {
+  const ana = await register('Ana Resumen', 'ana.resumen@test.com');
+  const token = ana.body.token;
+  await createTask(token, { title: 'Pendiente personal' });
+  const done = await createTask(token, { title: 'Terminada' });
+  await api.patch(`/api/tasks/${done.body.id}/status`).set('Authorization', `Bearer ${token}`).send({ status: 'DONE' });
+  // Tarea de otro usuario: no debe contarse
+  const bob = await register('Bob Resumen', 'bob.resumen@test.com');
+  await createTask(bob.body.token, { title: 'Ajena' });
+
+  const res = await api.get('/api/tasks/summary').set('Authorization', `Bearer ${token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.total, 2);
+  assert.equal(res.body.pending, 1);
+  assert.equal(res.body.done, 1);
+  assert.equal(res.body.personal, 2);
+  assert.equal(typeof res.body.overdue, 'number');
+  assert.equal(typeof res.body.dueSoon, 'number');
+});
+
+test('GET /api/tasks/summary → 401 sin autenticación', async () => {
+  const res = await api.get('/api/tasks/summary');
+  assert.equal(res.status, 401);
+});

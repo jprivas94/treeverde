@@ -126,6 +126,8 @@ export const authApi = {
 // ─── Tasks ─────────────────────────────────────
 export const tasksApi = {
   getAll: (params) => request(withQuery('/tasks', params)),
+  // Estadísticas de todas las tareas visibles (panel de proyectos)
+  getSummary: () => request('/tasks/summary'),
   getById: (id) => request(`/tasks/${id}`),
   create: (data) => request('/tasks', send('POST', data)),
   update: (id, data) => request(`/tasks/${id}`, send('PUT', data)),

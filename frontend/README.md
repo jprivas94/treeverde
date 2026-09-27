@@ -104,7 +104,7 @@ src/
 │   └── useAppSync.js          # Tableros, realtime y sincronización entre pestañas
 ├── features/                  # Una carpeta por funcionalidad
 │   ├── auth/                  # Login, registro, recuperar y restablecer contraseña
-│   ├── boards/                # Panel "Mis tableros" (BoardCard, BoardFormModal, InviteBoardModal)
+│   ├── boards/                # Panel "Mis Proyectos" (ProjectsSummary, ProjectRow, BoardFormModal, InviteBoardModal)
 │   ├── kanban/                # Board + hooks (useBoardTasks, useTaskActions, useColumnScroll)
 │   ├── tasks/                 # Crear/editar/ver tareas, TaskFormFields, imágenes, taskService
 │   ├── history/               # Historial (CompletedTasksPanel + historyUtils)
