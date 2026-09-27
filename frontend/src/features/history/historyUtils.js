@@ -92,7 +92,7 @@ export function filterHistory(list, { search, priority, timing, sort }) {
 
   return [...list]
     .sort((a, b) => (sort === 'newest' ? time(b) - time(a) : time(a) - time(b)))
-    .filter((t) => !q || [t.title, t.description, t.creator?.name, t.assignee?.name, t.tags]
+    .filter((t) => !q || [t.title, t.description, t.creator?.name, t.assignee?.name, t.tags, t.board?.name]
       .some((field) => (field || '').toLowerCase().includes(q)))
     .filter((t) => !priority || t.priority === priority)
     .filter((t) => !timing || (TIMING_MATCHERS[timing]?.(getTaskTiming(t)) ?? true));

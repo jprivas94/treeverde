@@ -86,7 +86,7 @@ export default function Board({ isDark, onToggleTheme, onBackToBoards }) {
         <TasksLoading />
       ) : showHistory ? (
         <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8"><TreeSpinner size="lg" /></div>}>
-          <CompletedTasksPanel tasks={tasks} archivedTasks={archivedTasks} onEditTask={(task) => setModal({ type: 'view', task })} />
+          <CompletedTasksPanel tasks={tasks} archivedTasks={archivedTasks} showBoard={!activeBoard} onEditTask={(task) => setModal({ type: 'view', task })} />
         </Suspense>
       ) : (
         <>

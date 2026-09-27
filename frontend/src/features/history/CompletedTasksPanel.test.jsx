@@ -119,3 +119,29 @@ test('CompletedTasksPanel: deduplica la misma tarea en tasks y archivedTasks', (
   getByText('1 tarea completada');
   assert.equal(container.querySelectorAll('tbody tr').length, 1, 'solo una fila para el mismo id');
 });
+
+// ─── Tablero de origen (vista "Todas las tareas") ───────────────────
+const ALPHA = { id: 'b1', name: 'Proyecto Alpha', color: 'blue', icon: '🚀' };
+
+test('CompletedTasksPanel: con showBoard cada fila indica su tablero (o Personal)', () => {
+  const { getByText } = render(
+    <CompletedTasksPanel tasks={[makeTask('t1', 'Con tablero', { board: ALPHA }), makeTask('t2', 'Sin tablero', { board: null })]} archivedTasks={[]} showBoard />
+  );
+  getByText('Proyecto Alpha');
+  getByText('Personal');
+});
+
+test('CompletedTasksPanel: sin showBoard no muestra la etiqueta de tablero', () => {
+  const { queryByText } = renderPanel([makeTask('t1', 'Con tablero', { board: ALPHA })]);
+  assert.equal(queryByText('Proyecto Alpha'), null);
+});
+
+test('CompletedTasksPanel: el buscador encuentra tareas por nombre de tablero', () => {
+  const { getByPlaceholderText, getByText, queryByText } = renderPanel([
+    makeTask('t1', 'Con tablero', { board: ALPHA }),
+    makeTask('t2', 'Otra tarea', { board: null }),
+  ]);
+  fireEvent.change(getByPlaceholderText('Buscar por titulo, creador, etiquetas...'), { target: { value: 'alpha' } });
+  getByText('Con tablero');
+  assert.equal(queryByText('Otra tarea'), null);
+});

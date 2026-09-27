@@ -6,6 +6,7 @@ import { formatDateFull } from '../../shared/utils/date';
 import UserChip from '../../shared/ui/UserChip';
 import ImageViewModal from './ImageViewModal';
 import { PersonField } from './TaskModalParts';
+import BoardBadge from '../boards/BoardBadge';
 
 const label = 'block text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-0';
 const value = 'text-sm px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg';
@@ -34,6 +35,11 @@ export default function TaskDetailsView({ task, user, sharedView, userColor, onT
       <div>
         <label className={label}>Título</label>
         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg">{task.title}</p>
+      </div>
+
+      <div>
+        <label className={label}>{'\u{1F5C2}'} Tablero</label>
+        <div className="px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg"><BoardBadge board={task.board} /></div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

@@ -162,3 +162,13 @@ test('EditTaskModal: generar enlace de invitación muestra la URL', async () => 
   assert.ok(inviteCall, 'debe llamar POST /tasks/:id/invite');
   assert.equal(JSON.parse(inviteCall.body).role, 'share');
 });
+
+test('EditTaskModal: la vista de detalle muestra el tablero de la tarea (o Personal)', () => {
+  stubFetch(defaultHandlers());
+  const conTablero = { ...TASK, board: { id: 'b1', name: 'Proyecto Alpha', color: 'blue', icon: '🚀' } };
+  const { getByText, unmount } = render(<EditTaskModal task={conTablero} readOnly onClose={() => {}} />);
+  getByText('Proyecto Alpha');
+  unmount();
+  const { getByText: getByText2 } = render(<EditTaskModal task={{ ...TASK, board: null }} readOnly onClose={() => {}} />);
+  getByText2('Personal');
+});

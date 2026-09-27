@@ -6,6 +6,7 @@ import Avatar from '../../shared/ui/Avatar';
 import Pagination from '../../shared/ui/Pagination';
 import ImageViewModal from '../tasks/ImageViewModal';
 import useImageGallery from '../tasks/useImageGallery';
+import BoardBadge from '../boards/BoardBadge';
 import {
   ITEMS_PER_PAGE, PRIORITY_FILTERS, STATUS_FILTERS, SORT_OPTIONS,
   completedTasks, filterHistory, getTaskTiming, completedDate,
@@ -27,7 +28,7 @@ const COLUMNS = [
 // ─── CompletedTasksPanel (Historial) ──────────────────────────────────
 // Tabla paginada de tareas completadas con búsqueda, filtros de prioridad
 // y puntualidad, y orden por fecha. La lógica pura vive en historyUtils.
-export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }) {
+export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask, showBoard = false }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const setFilter = (key) => (value) => { setFilters((f) => ({ ...f, [key]: value })); setPage(1); };
@@ -123,7 +124,7 @@ export default function CompletedTasksPanel({ tasks, archivedTasks, onEditTask }
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {pageItems.map((task) => (
-                  <HistoryRow key={task.id} task={task} onOpen={() => onEditTask?.(task)} onViewImages={() => gallery.openForTask(task)} />
+                  <HistoryRow key={task.id} task={task} showBoard={showBoard} onOpen={() => onEditTask?.(task)} onViewImages={() => gallery.openForTask(task)} />
                 ))}
               </tbody>
             </table>
@@ -159,7 +160,7 @@ function HistoryPerson({ user, avatarClass }) {
   );
 }
 
-function HistoryRow({ task, onOpen, onViewImages }) {
+function HistoryRow({ task, onOpen, onViewImages, showBoard }) {
   const timing = getTaskTiming(task);
   const priority = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.MEDIUM;
   const imgCount = getTaskImages(task).length;
@@ -183,6 +184,7 @@ function HistoryRow({ task, onOpen, onViewImages }) {
                 </button>
               )}
             </div>
+            {showBoard && <div className="mt-1"><BoardBadge board={task.board} /></div>}
             {task.description && (
               <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 mt-0.5 line-clamp-1">{task.description}</p>
             )}
