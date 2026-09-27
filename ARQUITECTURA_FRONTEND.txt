@@ -1,0 +1,211 @@
+===============================================================================
+  TREEVERDE - ARQUITECTURA DEL FRONTEND
+  Refactorización: arquitectura por funcionalidades (Feature-Based)
+===============================================================================
+
+1. RESUMEN
+-------------------------------------------------------------------------------
+Antes, casi todo el frontend vivía en una sola carpeta plana `src/components/`
+(40 archivos mezclados: pantallas, modales, botones, formularios...). Varios
+componentes eran enormes (Board.jsx tenía 818 líneas; BoardsPanel 509;
+CompletedTasksPanel 447) y el mismo código estaba copiado en muchos sitios:
+
+  - El cierre con la tecla ESC estaba repetido en ~10 modales.
+  - El menú de usuario estaba duplicado en Board y en BoardsPanel.
+  - La búsqueda de usuarios y el "copiar enlace" estaban copiados en 3 modales.
+  - 3 modales de confirmación (eliminar tarea / vaciar tablero / eliminar
+    tablero) eran casi idénticos.
+  - Los 4 formularios de autenticación repetían el mismo input con icono.
+  - App.jsx tenía dos bloques casi iguales para las invitaciones por URL.
+
+Se reorganizó el código con una ARQUITECTURA POR FUNCIONALIDADES
+(Feature-Based Architecture, una versión simplificada de "Feature-Sliced
+Design"), que es la estructura recomendada hoy para SPAs de React de tamaño
+medio: cada funcionalidad del producto tiene su propia carpeta con todo lo
+que necesita, y lo reutilizable vive en una capa compartida.
+
+Resultado:
+  - Código fuente: 7.837 -> 6.840 líneas (-13 %, ~1.000 líneas menos).
+  - Archivo más grande: 818 -> 306 líneas.
+  - Board.jsx: 818 -> 164 líneas (la lógica pasó a hooks).
+  - App.jsx: 353 -> 65 líneas.
+  - Mismo comportamiento: los 78 tests unitarios y los 95 de componentes
+    pasan sin cambios en sus aserciones; lint sin errores; build OK.
+
+
+2. ESTRUCTURA DE CARPETAS
+-------------------------------------------------------------------------------
+frontend/src/
+|
+|-- main.jsx               Punto de entrada (monta React + captura errores globales)
+|-- index.css
+|
+|-- app/                   CAPA APP: arranque y composición de pantallas
+|   |-- App.jsx            Decide qué pantalla mostrar según la sesión
+|   `-- useAppSync.js      Sincronización global (tableros, realtime, pestañas)
+|
+|-- features/              CAPA FEATURES: una carpeta por funcionalidad
+|   |-- auth/              Login, registro, recuperar/restablecer contraseña
+|   |   |-- AuthScreens.jsx      Navegación entre pantallas sin sesión
+|   |   |-- AuthParts.jsx        Piezas comunes (campo con icono, cabecera, error...)
+|   |   |-- LoginForm / RegisterForm / ForgotPasswordForm / ResetPasswordForm
+|   |   |-- AuthLayout / AuthSkeleton
+|   |   `-- useAuth.js / useSessionRestore.js
+|   |
+|   |-- boards/            Panel "Mis tableros"
+|   |   |-- BoardsPanel.jsx      Pantalla del panel
+|   |   |-- BoardCard.jsx        Tarjeta de un tablero (con su menú ⋯)
+|   |   |-- BoardFormModal.jsx   Crear / editar tablero
+|   |   |-- InviteBoardModal.jsx Invitar miembros
+|   |   `-- boardService.js      refreshBoards() (API + store)
+|   |
+|   |-- kanban/            Tablero Kanban
+|   |   |-- Board.jsx            Pantalla del tablero (solo compone)
+|   |   |-- BoardHeader.jsx      Header con botones del tablero
+|   |   |-- BoardStates.jsx      Estados: cargando / vacío / cargar más
+|   |   |-- Column.jsx, TaskCard.jsx, ColumnNav.jsx, BoardSkeleton.jsx
+|   |   |-- ConfirmClearBoardModal.jsx
+|   |   |-- useBoardTasks.js     Carga inicial + paginación
+|   |   |-- useTaskActions.js    Mover, archivar, eliminar, vaciar (optimista + rollback)
+|   |   `-- useColumnScroll.js   Scroll horizontal en móvil + altura de columnas
+|   |
+|   |-- tasks/             Crear, editar y ver tareas
+|   |   |-- CreateTaskModal / EditTaskModal / TaskDetailsView / TaskFormFields
+|   |   |-- TaskModalParts.jsx   Marco del modal, "Creado por", botones, "Compartir con"
+|   |   |-- TaskCompleteModal / ConfirmDeleteModal
+|   |   |-- DatePickerModal / SearchableUserSelect / ImageUploadModal / ImageViewModal
+|   |   |-- useUserSearch.js     Lista + búsqueda de usuarios
+|   |   |-- useTaskInvite.js     Enlace de invitación de una tarea
+|   |   |-- useImageGallery.js   Galería de imágenes navegable
+|   |   `-- taskService.js       reloadTasks(), loadMoreTasks(), patchTaskInStore()
+|   |
+|   |-- history/           Historial de tareas completadas
+|   |   |-- CompletedTasksPanel.jsx
+|   |   `-- historyUtils.js      Lógica pura: filtros, orden, puntualidad
+|   |
+|   |-- invites/           Invitaciones por URL (?invite= y ?boardInvite=)
+|   |   `-- useInviteLink.js     Un solo hook para ambos tipos
+|   |
+|   |-- notifications/     Campana de notificaciones
+|   |-- profile/           UserMenu, EditProfileModal, Welcome/Goodbye (GreetingModal)
+|   `-- layout/            AppHeader (header común del panel y del tablero)
+|
+|-- shared/                CAPA SHARED: reutilizable, sin lógica de negocio
+|   |-- ui/                Componentes visuales genéricos
+|   |   |-- Modal.jsx            Overlay + panel + ESC + clic fuera
+|   |   |-- ConfirmDialog.jsx    Confirmación de acciones destructivas
+|   |   |-- LazyModal.jsx        Suspense + spinner para modales cargados bajo demanda
+|   |   |-- CopyLinkField.jsx    Campo de enlace + botón "Copiar"
+|   |   |-- Pagination.jsx, Toast.jsx, Spinner.jsx, UserChip.jsx
+|   |   `-- Avatar, TreeLogo, TreeSpinner, ThemeToggle, HeaderGhostButton, ErrorBoundary
+|   |-- hooks/             useEscapeKey, useClickOutside, useClipboard, useTheme
+|   |-- services/          api.js (cliente HTTP), realtime, sessionSync, logger, cloudinary
+|   |-- utils/             date, images, tasks (incluye permisos), url
+|   `-- constants/         kanbanConfig.js
+|
+|-- store/                 Estado global (Zustand) - sin cambios de API
+`-- test/                  Utilidades de test (jsdom, stubs de fetch)
+
+Los tests ahora viven JUNTO al archivo que prueban (p. ej.
+features/kanban/Board.test.jsx al lado de Board.jsx).
+
+
+3. REGLAS DE LA ARQUITECTURA
+-------------------------------------------------------------------------------
+a) Dirección de las dependencias (de arriba hacia abajo, nunca al revés):
+
+        app/  -->  features/  -->  shared/
+                       |              ^
+                       `--> store/ ---'
+
+   - `shared/` NUNCA importa de `features/` ni de `app/`. Así cualquier
+     pieza compartida se puede usar en cualquier sitio sin sorpresas.
+   - Una feature puede usar componentes públicos de otra (p. ej. kanban usa
+     el CreateTaskModal de tasks), pero la lógica de cada una queda en su carpeta.
+
+b) Dentro de cada feature, tres "capas" pequeñas:
+
+   COMPONENTES (.jsx)  ->  qué se ve. Reciben datos y llaman a acciones.
+   HOOKS (useXxx.js)   ->  estado y lógica de la pantalla (cargar, mover,
+                           paginar, validar...). Se prueban sin tocar la UI.
+   SERVICIOS (xxxService.js / xxxUtils.js) -> operaciones que combinan la API
+                           con el store, o lógica pura sin React.
+
+   Ejemplo: Board.jsx solo dibuja. La carga está en useBoardTasks, las
+   acciones (mover/archivar/eliminar/vaciar) en useTaskActions y el scroll
+   en useColumnScroll. Si mañana cambia cómo se archivan las tareas, se toca
+   un solo archivo.
+
+c) Una sola fuente para cada cosa repetida:
+   - ¿Un modal nuevo?          -> usar <Modal> (ESC y clic fuera ya incluidos).
+   - ¿Confirmar algo?           -> usar <ConfirmDialog>.
+   - ¿Un menú desplegable?      -> useClickOutside.
+   - ¿Copiar un enlace?         -> <CopyLinkField>.
+   - ¿Permisos de una tarea?    -> isCreator / isAssigneeOnly / isSharedUser
+                                   en shared/utils/tasks.js.
+   - ¿Nueva llamada a la API?   -> añadirla en shared/services/api.js con los
+                                   helpers send() y withQuery().
+
+
+4. QUÉ SE UNIFICÓ (ANTES -> AHORA)
+-------------------------------------------------------------------------------
+- ESC en ~10 modales (useEffect copiado)        -> useEscapeKey / <Modal>
+- Clic fuera en 3 menús                         -> useClickOutside
+- Menú de usuario en Board y BoardsPanel        -> features/profile/UserMenu
+- Header de Board y BoardsPanel                 -> features/layout/AppHeader
+- 3 modales de confirmación                     -> shared/ui/ConfirmDialog
+- Copiar enlace en 3 modales                    -> useClipboard + CopyLinkField
+- Búsqueda de usuarios en Crear y Editar        -> useUserSearch
+- Enlace de invitación de tarea (Crear/Editar)  -> useTaskInvite
+- Chips de "compartido con" (3 sitios)          -> UserChip + ShareSection
+- "Creado por / Asignado a" (3 sitios)          -> PersonField
+- Galería de imágenes (Board e Historial)       -> useImageGallery
+- Invitación a tarea y a tablero en App.jsx     -> useInviteLink (un solo hook)
+- Recargar tareas / tableros (5 sitios)         -> taskService / boardService
+- Permisos de tarea (Board y EditTaskModal)     -> shared/utils/tasks.js
+- Paginación del historial                      -> shared/ui/Pagination
+- Filtros/orden/puntualidad del historial       -> history/historyUtils.js
+- Input con icono en 4 formularios de auth      -> AuthField (AuthParts.jsx)
+- Modales de Bienvenida y Despedida             -> GreetingModal
+- Endpoints de la API (method + JSON repetido)  -> helpers send() y withQuery()
+
+
+5. CORRECCIONES INCLUIDAS
+-------------------------------------------------------------------------------
+- El menú ⋯ de las tarjetas de tablero quedaba recortado y "Eliminar tablero"
+  no se veía. Ahora se muestra completo.
+- "Vaciar tablero" borraba las tareas en el servidor pero las archivadas
+  seguían apareciendo en el Historial hasta recargar. Ahora se limpian.
+- El panel "Mis tableros" no tenía los data-testid del menú de usuario que
+  usa el test e2e (user-menu-button, logout-button...). Al unificar el menú,
+  ya los tiene.
+- Con un banner de invitación a tablero, "¿Olvidaste tu contraseña?" mostraba
+  el registro por error. Ahora abre la recuperación de contraseña.
+- El modal de finalización reiniciaba su temporizador de 5 s en cada render.
+  Ahora es estable.
+
+Cambios visuales menores (por consistencia): eliminar un tablero usa ahora el
+mismo diálogo rojo que eliminar una tarea, y el enlace de invitación en
+"Editar tarea" usa el mismo campo que el resto de invitaciones.
+
+
+6. CÓMO AÑADIR UNA FUNCIONALIDAD NUEVA
+-------------------------------------------------------------------------------
+Ejemplo: "comentarios en tareas".
+  1. Crear la carpeta  src/features/comments/
+  2. Componentes:      CommentList.jsx, CommentForm.jsx (usando shared/ui)
+  3. Lógica:           useComments.js (cargar, añadir, borrar)
+  4. API:              commentsApi en shared/services/api.js
+  5. Test:             CommentList.test.jsx en la misma carpeta
+  6. Usarlo desde:     features/tasks/EditTaskModal.jsx
+No hace falta tocar nada más: la feature queda aislada y es fácil de encontrar.
+
+
+7. TESTS Y SCRIPTS
+-------------------------------------------------------------------------------
+Los scripts de package.json ahora buscan los tests en todo src/ (antes tenían
+la lista de archivos escrita a mano):
+  npm test                 -> node --test "src/**/*.test.js"      (78 tests)
+  npm run test:components  -> ... --test "src/**/*.test.jsx"     (95 tests)
+  npm run lint / npm run build  -> sin errores
+===============================================================================

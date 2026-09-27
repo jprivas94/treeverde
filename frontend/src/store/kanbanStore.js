@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { BOARD_STATUSES, STATUS_LABELS } from '../constants/kanbanConfig.js';
-import { broadcastLogout } from '../services/sessionSync.js';
+import { BOARD_STATUSES, STATUS_LABELS } from '../shared/constants/kanbanConfig.js';
+import { broadcastLogout } from '../shared/services/sessionSync.js';
 
 // ARCHIVED se muestra como 'Terminado' en el tablero
 const BOARD_TITLES = { ...STATUS_LABELS, ARCHIVED: '🗑 Terminado' };

@@ -98,35 +98,33 @@ Asegúrate de que el backend esté corriendo en `http://localhost:3001`.
 
 ```
 src/
-├── components/
-│   ├── Board.jsx              # Tablero Kanban principal (lazy + Suspense para modales)
-│   ├── BoardSkeleton.jsx      # Skeleton del tablero durante la carga inicial
-│   ├── Column.jsx             # Columna droppable
-│   ├── TaskCard.jsx           # Tarjeta de tarea (arrastrable y clickeable)
-│   ├── CreateTaskModal.jsx    # Modal para crear tareas
-│   ├── EditTaskModal.jsx      # Modal para editar tareas
-│   ├── TaskFormFields.jsx     # Formulario compartido (crear/editar)
-│   ├── TaskDetailsView.jsx    # Vista de solo lectura / compartida
-│   ├── CompletedTasksPanel.jsx # Panel de historial con tabla
-│   ├── NotificationPanel.jsx  # Panel de notificaciones
-│   ├── SearchableUserSelect.jsx # Selector de usuarios con búsqueda
-│   ├── LoginForm.jsx          # Formulario de inicio de sesión
-│   └── RegisterForm.jsx       # Formulario de registro
-├── constants/
-│   └── kanbanConfig.js        # Config central (estados, colores, TASKS_PAGE_SIZE)
-├── hooks/
-│   └── useAuth.js             # Hook de autenticación
-├── services/
-│   ├── api.js                 # Cliente HTTP para la API
-│   ├── realtime.js            # Realtime de Supabase (notificaciones + tablero en vivo)
-│   └── sessionSync.js         # Sincronización de sesión entre pestañas (BroadcastChannel)
+├── main.jsx                   # Entry point (monta React + errores globales)
+├── app/
+│   ├── App.jsx                # Raíz: auth / skeleton / panel de tableros / tablero
+│   └── useAppSync.js          # Tableros, realtime y sincronización entre pestañas
+├── features/                  # Una carpeta por funcionalidad
+│   ├── auth/                  # Login, registro, recuperar y restablecer contraseña
+│   ├── boards/                # Panel "Mis tableros" (BoardCard, BoardFormModal, InviteBoardModal)
+│   ├── kanban/                # Board + hooks (useBoardTasks, useTaskActions, useColumnScroll)
+│   ├── tasks/                 # Crear/editar/ver tareas, TaskFormFields, imágenes, taskService
+│   ├── history/               # Historial (CompletedTasksPanel + historyUtils)
+│   ├── invites/               # Invitaciones por URL (useInviteLink)
+│   ├── notifications/         # Panel de notificaciones
+│   ├── profile/               # UserMenu, EditProfileModal, bienvenida/despedida
+│   └── layout/                # AppHeader común
+├── shared/                    # Reutilizable (nunca importa de features/)
+│   ├── ui/                    # Modal, ConfirmDialog, LazyModal, Pagination, Avatar...
+│   ├── hooks/                 # useEscapeKey, useClickOutside, useClipboard, useTheme
+│   ├── services/              # api.js, realtime.js, sessionSync.js, logger.js, cloudinary.js
+│   ├── utils/                 # date, images, tasks (permisos), url
+│   └── constants/             # kanbanConfig.js (estados, colores, TASKS_PAGE_SIZE)
 ├── store/
 │   └── kanbanStore.js         # Estado global (Zustand) + paginación (tasksHasMore)
-├── utils/
-│   └── images.js              # getCloudinaryThumb() — miniaturas de Cloudinary
-├── App.jsx                    # Componente raíz (carga paralela + skeleton)
-└── main.jsx                   # Entry point
+└── test/                      # Utilidades de test (jsdom, stubs de fetch)
 ```
+
+Los tests viven junto al archivo que prueban. Detalle de la arquitectura en
+[`ARQUITECTURA_FRONTEND.txt`](../ARQUITECTURA_FRONTEND.txt).
 
 ---
 

@@ -5,7 +5,7 @@
 // desactiva el soporte nativo del evento 'input' (isInputEventSupported)
 // y activa el polyfill legacy (attachEvent) que rompe focusin/onChange.
 // Por eso los archivos de test DEBEN importar este módulo PRIMERO:
-//   import '../test/setupDom';
+//   import '../../test/setupDom';
 import { JSDOM } from 'jsdom';
 import { after } from 'node:test';
 

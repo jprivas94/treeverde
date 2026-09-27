@@ -108,23 +108,26 @@ treeverdev1/
     ├── tailwind.config.js
     ├── postcss.config.js
     └── src/
-        ├── main.jsx         ← bootstrap de React
-        ├── App.jsx          ← máquina de estados de auth + enrutado condicional
+        ├── main.jsx         ← bootstrap de React + captura de errores globales
         ├── index.css
-        ├── hooks/
-        │   └── useAuth.js   ← hook de login/logout
-        ├── services/
-        │   ├── api.js       ← cliente HTTP con reintentos y timeout (authApi, tasksApi, usersApi…)
-        │   ├── realtime.js  ← Realtime de Supabase (suscribe Notification y Task por usuario)
-        │   ├── sessionSync.js ← sincronización de sesión entre pestañas (BroadcastChannel)
-        │   └── logger.js    ← logging en consola del frontend
-        ├── constants/
-        │   ├── kanbanConfig.js ← config central del tablero (estados, colores, prioridades)
-        │   └── kanbanConfig.test.js ← tests de la config (node:test)
-        ├── store/
-        │   ├── kanbanStore.js ← store global de Zustand
-        │   └── kanbanStore.test.js ← tests del store (node:test)
-        └── components/      ← UI: Board, Column, TaskCard, TaskFormFields, TaskDetailsView, modales…
+        ├── app/             ← App.jsx (pantalla según sesión) + useAppSync (tableros, realtime, pestañas)
+        ├── features/        ← arquitectura por funcionalidades (ver ARQUITECTURA_FRONTEND.txt)
+        │   ├── auth/        ← login, registro, recuperar/restablecer contraseña
+        │   ├── boards/      ← panel "Mis tableros", crear/editar/invitar
+        │   ├── kanban/      ← tablero: Board + hooks useBoardTasks / useTaskActions / useColumnScroll
+        │   ├── tasks/       ← crear/editar/ver tareas, formulario, imágenes, taskService
+        │   ├── history/     ← historial de completadas + historyUtils (lógica pura)
+        │   ├── invites/     ← invitaciones por URL (?invite / ?boardInvite)
+        │   ├── notifications/, profile/, layout/
+        ├── shared/          ← reutilizable, nunca importa de features/
+        │   ├── ui/          ← Modal, ConfirmDialog, LazyModal, Pagination, Avatar…
+        │   ├── hooks/       ← useEscapeKey, useClickOutside, useClipboard, useTheme
+        │   ├── services/    ← api.js (reintentos + timeout), realtime.js, sessionSync.js, logger.js
+        │   ├── utils/       ← fechas, imágenes, tareas (incluye permisos), URL
+        │   └── constants/   ← kanbanConfig.js (estados, colores, prioridades)
+        └── store/
+            └── kanbanStore.js ← store global de Zustand
+        (los tests *.test.js(x) viven junto al archivo que prueban)
 ```
 
 ---
@@ -256,7 +259,7 @@ Las notificaciones se crean a través de `src/utils/notifications.js` (`notifyAs
 El frontend recibe **notificaciones y cambios de tareas en vivo** sin depender de conexiones persistentes en el backend serverless:
 
 1. La migración `20260801000001_add_supabase_realtime` añade las tablas `"Notification"` y `"Task"` a la publicación `supabase_realtime` (idempotente) y fija `REPLICA IDENTITY FULL` en `Task` para que los eventos `DELETE` incluyan la fila completa y sean filtrables.
-2. `frontend/src/services/realtime.js` (`connectRealtime(userId)`) suscribe con `postgres_changes` a:
+2. `frontend/src/shared/services/realtime.js` (`connectRealtime(userId)`) suscribe con `postgres_changes` a:
    - `Notification` — INSERT filtrado por `userId=eq.<id>` → `addNotification` (prepend + `unreadCount`).
    - `Task` — INSERT/UPDATE/DELETE filtrado por `creatorId` **o** `assigneeId` → `upsertTask`/`removeTask` (el detalle se re-fetchea si la tarea no estaba cargada, para conservar relaciones).
 3. `App.jsx` conecta el canal al iniciar sesión y lo desconecta al cerrar (`removeChannel`).

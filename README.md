@@ -86,14 +86,13 @@ treeverde/
 │
 ├── frontend/          # UI (React + Vite + Tailwind)
 │   ├── src/
-│   │   ├── components/ # Componentes React (+ BoardSkeleton)
-│   │   ├── constants/  # Config central del tablero (kanbanConfig.js)
-│   │   ├── hooks/      # Hooks personalizados
-│   │   ├── services/   # Cliente HTTP
+│   │   ├── app/        # App.jsx (pantalla según sesión) + sincronización global
+│   │   ├── features/   # Una carpeta por funcionalidad: auth, boards, kanban,
+│   │   │               #   tasks, history, invites, notifications, profile, layout
+│   │   ├── shared/     # Reutilizable: ui/, hooks/, services/ (API), utils/, constants/
 │   │   ├── store/      # Estado global (Zustand) con paginación
-│   │   ├── utils/      # images.js (miniaturas Cloudinary)
-│   │   ├── App.jsx     # Componente raíz (carga paralela + skeleton)
 │   │   └── main.jsx    # Entry point
+│   │               # Detalle de la arquitectura: ARQUITECTURA_FRONTEND.txt
 │   ├── .gitignore
 │   └── package.json
 │
