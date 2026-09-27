@@ -80,7 +80,7 @@ router.get('/', async (req, res) => {
     })));
   } catch (err) {
     logger.error('Error al obtener tableros', err, { userId: req.userId });
-    res.status(500).json({ error: 'Error al obtener tableros' });
+    res.status(500).json({ error: 'Error al obtener proyectos' });
   }
 });
 
@@ -90,7 +90,7 @@ router.post('/', async (req, res) => {
     const { name, description, color, icon } = req.body;
 
     if (!isNonEmptyString(name) || name.trim().length > 80) {
-      return res.status(400).json({ error: 'El nombre del tablero es requerido (máx 80 caracteres)' });
+      return res.status(400).json({ error: 'El nombre del proyecto es requerido (máx 80 caracteres)' });
     }
     if (description !== undefined && (!isStringSafe(description) || description.length > 200)) {
       return res.status(400).json({ error: 'La descripción es demasiado larga (máx 200 caracteres)' });
@@ -123,7 +123,7 @@ router.post('/', async (req, res) => {
     });
   } catch (err) {
     logger.error('Error al crear tablero', err, { userId: req.userId, name: req.body?.name });
-    res.status(500).json({ error: 'Error al crear tablero' });
+    res.status(500).json({ error: 'Error al crear proyecto' });
   }
 });
 
@@ -132,10 +132,10 @@ router.get('/:id', async (req, res) => {
   try {
     const board = await findBoard(req.params.id);
     if (!board) {
-      return res.status(404).json({ error: 'Tablero no encontrado' });
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
     if (!isMember(board, req.userId)) {
-      return res.status(403).json({ error: 'No tienes acceso a este tablero' });
+      return res.status(403).json({ error: 'No tienes acceso a este proyecto' });
     }
     const { members, _count, ...rest } = board;
     res.json({
@@ -145,7 +145,7 @@ router.get('/:id', async (req, res) => {
     });
   } catch (err) {
     logger.error('Error al obtener tablero', err, { userId: req.userId, boardId: req.params?.id });
-    res.status(500).json({ error: 'Error al obtener tablero' });
+    res.status(500).json({ error: 'Error al obtener proyecto' });
   }
 });
 
@@ -154,17 +154,17 @@ router.put('/:id', async (req, res) => {
   try {
     const board = await findBoard(req.params.id);
     if (!board) {
-      return res.status(404).json({ error: 'Tablero no encontrado' });
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
     if (!isOwner(board, req.userId)) {
-      return res.status(403).json({ error: 'Solo el dueño puede editar el tablero' });
+      return res.status(403).json({ error: 'Solo el dueño puede editar el proyecto' });
     }
 
     const { name, description, color, icon } = req.body;
     const data = {};
     if (name !== undefined) {
       if (!isNonEmptyString(name) || name.trim().length > 80) {
-        return res.status(400).json({ error: 'El nombre del tablero es requerido (máx 80 caracteres)' });
+        return res.status(400).json({ error: 'El nombre del proyecto es requerido (máx 80 caracteres)' });
       }
       data.name = name.trim();
     }
@@ -200,7 +200,7 @@ router.put('/:id', async (req, res) => {
     });
   } catch (err) {
     logger.error('Error al actualizar tablero', err, { userId: req.userId, boardId: req.params?.id });
-    res.status(500).json({ error: 'Error al actualizar tablero' });
+    res.status(500).json({ error: 'Error al actualizar proyecto' });
   }
 });
 
@@ -211,7 +211,7 @@ router.post('/:id/invite', async (req, res) => {
   try {
     const board = await findBoard(req.params.id);
     if (!board) {
-      return res.status(404).json({ error: 'Tablero no encontrado' });
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
     if (!isOwner(board, req.userId)) {
       return res.status(403).json({ error: 'Solo el dueño puede generar el enlace de invitación' });
@@ -236,13 +236,13 @@ router.delete('/:id/members/:userId', async (req, res) => {
   try {
     const board = await findBoard(req.params.id);
     if (!board) {
-      return res.status(404).json({ error: 'Tablero no encontrado' });
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
     if (!isOwner(board, req.userId)) {
       return res.status(403).json({ error: 'Solo el dueño puede gestionar los miembros' });
     }
     if (req.params.userId === board.ownerId) {
-      return res.status(400).json({ error: 'El dueño no puede ser removido del tablero' });
+      return res.status(400).json({ error: 'El dueño no puede ser removido del proyecto' });
     }
 
     await prisma.boardMember.deleteMany({
@@ -267,10 +267,10 @@ router.delete('/:id/tasks', async (req, res) => {
       include: { members: { select: { userId: true } } }
     });
     if (!board) {
-      return res.status(404).json({ error: 'Tablero no encontrado' });
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
     if (!board.members.some((m) => m.userId === req.userId)) {
-      return res.status(403).json({ error: 'No tienes acceso a este tablero' });
+      return res.status(403).json({ error: 'No tienes acceso a este proyecto' });
     }
 
     const result = await prisma.task.deleteMany({
@@ -287,7 +287,7 @@ router.delete('/:id/tasks', async (req, res) => {
     res.json({ message: 'Tareas eliminadas', deleted: result.count });
   } catch (err) {
     logger.error('Error al vaciar el tablero', err, { userId: req.userId, boardId: req.params?.id });
-    res.status(500).json({ error: 'Error al eliminar las tareas del tablero' });
+    res.status(500).json({ error: 'Error al eliminar las tareas del proyecto' });
   }
 });
 
@@ -296,20 +296,20 @@ router.delete('/:id', async (req, res) => {
   try {
     const board = await findBoard(req.params.id);
     if (!board) {
-      return res.status(404).json({ error: 'Tablero no encontrado' });
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
     if (!isOwner(board, req.userId)) {
-      return res.status(403).json({ error: 'Solo el dueño puede eliminar el tablero' });
+      return res.status(403).json({ error: 'Solo el dueño puede eliminar el proyecto' });
     }
     // Cascade: BoardMember y Task (boardId) se eliminan en cascada
     await prisma.board.delete({ where: { id: board.id } });
-    res.json({ message: 'Tablero eliminado' });
+    res.json({ message: 'Proyecto eliminado' });
   } catch (err) {
     if (err.code === 'P2025') {
-      return res.status(404).json({ error: 'Tablero no encontrado' });
+      return res.status(404).json({ error: 'Proyecto no encontrado' });
     }
     logger.error('Error al eliminar tablero', err, { userId: req.userId, boardId: req.params?.id });
-    res.status(500).json({ error: 'Error al eliminar tablero' });
+    res.status(500).json({ error: 'Error al eliminar proyecto' });
   }
 });
 

@@ -137,7 +137,7 @@ router.post('/board/:token/accept', authenticate, async (req, res) => {
 
     // Idempotente: ya es miembro → no hacer nada
     if (board.members.some((m) => m.userId === req.userId)) {
-      return res.json({ message: 'Ya eres parte de este tablero', boardId: board.id });
+      return res.json({ message: 'Ya eres parte de este proyecto', boardId: board.id });
     }
 
     await prisma.boardMember.create({
@@ -153,15 +153,15 @@ router.post('/board/:token/accept', authenticate, async (req, res) => {
       await safeCreate(prisma, {
         userId: board.ownerId,
         type: 'INVITE_ACCEPTED',
-        message: `${joiner?.name || 'Un usuario'} se unió a tu tablero "${board.name}"`
+        message: `${joiner?.name || 'Un usuario'} se unió a tu proyecto "${board.name}"`
       });
     }
 
-    res.json({ message: `Te uniste al tablero "${board.name}"`, boardId: board.id });
+    res.json({ message: `Te uniste al proyecto "${board.name}"`, boardId: board.id });
   } catch (err) {
     if (err.code === 'P2002') {
       // Carrera: la membresía ya existía entre el find y el create
-      return res.json({ message: 'Ya eres parte de este tablero', boardId: null });
+      return res.json({ message: 'Ya eres parte de este proyecto', boardId: null });
     }
     logger.error('Error al aceptar invitación de tablero', err, { token: req.params?.token });
     res.status(500).json({ error: 'Error al aceptar la invitación' });

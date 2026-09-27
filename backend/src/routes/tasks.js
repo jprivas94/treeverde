@@ -136,7 +136,7 @@ router.post('/', async (req, res) => {
     if (boardId) {
       const board = await resolveBoardForUser(boardId, req.userId);
       if (!board) {
-        return res.status(400).json({ error: 'Tablero inválido o sin acceso' });
+        return res.status(400).json({ error: 'Proyecto inválido o sin acceso' });
       }
     }
 
@@ -288,7 +288,7 @@ router.put('/:id', async (req, res) => {
     if (boardId !== undefined && !isAssigneeOnly) {
       const board = await resolveBoardForUser(boardId, req.userId);
       if (!board) {
-        return res.status(400).json({ error: 'Tablero inválido o sin acceso' });
+        return res.status(400).json({ error: 'Proyecto inválido o sin acceso' });
       }
     }
 
